@@ -48,14 +48,16 @@ NODE_ENV=production npx knex migrate:latest --env production
 
 ## Railway
 
-**`getaddrinfo ENOTFOUND postgres.railway.internal`** means you are using Railway’s **private** Postgres hostname **outside** Railway (e.g. from your laptop). That host only resolves **between services** in the same project.
+This repo includes [`railway.toml`](railway.toml) with **`preDeployCommand`** so **`npm run migrate:prod`** runs on each deploy **inside Railway**, where `postgres.railway.internal` resolves. Redeploy after pulling this change.
 
-| Where you run migrations | What to use |
-|--------------------------|-------------|
-| **On Railway** (Release Command, or `railway run` linked to the project) | The normal **`DATABASE_URL`** (often `postgres.railway.internal` / internal) — works. |
-| **On your computer** | Use the **public** connection string from the Postgres service: **Variables** tab → **`DATABASE_PUBLIC_URL`**, or **Connect** → **Public network** / TCP proxy URL — **not** the internal-only URL. |
+**`getaddrinfo ENOTFOUND postgres.railway.internal`** always means the client is **not** on Railway’s private network:
 
-Recommended: set the API service **Release Command** to `npx knex migrate:latest --env production` so migrations run in Railway with the correct internal URL.
+| Where you run Node / Knex | `DATABASE_URL` to use |
+|---------------------------|------------------------|
+| **Railway** (deployed API, or `preDeployCommand`) | Service reference / internal URL (`*.railway.internal`) — OK |
+| **Your laptop** or CI outside Railway | **`DATABASE_PUBLIC_URL`** from the Postgres plugin (or **Connect → Public**). Never paste the internal URL into local `.env`. |
+
+If the **deployed** API still logs `ENOTFOUND` for `postgres.railway.internal`, the API service is not receiving a valid Railway-injected `DATABASE_URL` (check **Variables** → reference the Postgres service’s `DATABASE_URL`, redeploy).
 
 ## Production on a VPS (outline)
 
