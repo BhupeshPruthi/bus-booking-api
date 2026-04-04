@@ -46,6 +46,17 @@ npm run migrate
 NODE_ENV=production npx knex migrate:latest --env production
 ```
 
+## Railway
+
+**`getaddrinfo ENOTFOUND postgres.railway.internal`** means you are using Railway’s **private** Postgres hostname **outside** Railway (e.g. from your laptop). That host only resolves **between services** in the same project.
+
+| Where you run migrations | What to use |
+|--------------------------|-------------|
+| **On Railway** (Release Command, or `railway run` linked to the project) | The normal **`DATABASE_URL`** (often `postgres.railway.internal` / internal) — works. |
+| **On your computer** | Use the **public** connection string from the Postgres service: **Variables** tab → **`DATABASE_PUBLIC_URL`**, or **Connect** → **Public network** / TCP proxy URL — **not** the internal-only URL. |
+
+Recommended: set the API service **Release Command** to `npx knex migrate:latest --env production` so migrations run in Railway with the correct internal URL.
+
 ## Production on a VPS (outline)
 
 1. Install Node 20+, PostgreSQL, nginx (optional but recommended), Certbot for TLS.
