@@ -1,0 +1,50 @@
+# Dependencies
+node_modules/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Uploads (keep directory structure but ignore files)
+uploads/*
+!uploads/.gitkeep
+
+# Coverage
+coverage/
+
+# Build
+dist/
+build/
+
+# Misc
+*.bak
+*.tmp
+
+# Android app lives in a separate GitHub repository
+MyBus/
+
+# Cursor / local tooling
+.cursor/
+
+# Local snapshots and scratch assets (do not commit)
+db-snapshot.json
+tmp_*.png
+
+# Local secrets directory (use env or vault on server)
+secrets/

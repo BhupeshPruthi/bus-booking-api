@@ -1,0 +1,65 @@
+{
+  "title": "Bus Booking API route manifest",
+  "baseUrl": "/api",
+  "notes": "Trimmed to match MyBus Android (ApiService.kt) + shared auth. Run npm run api:list to print this list.",
+  "consistencyAudit": {
+    "lastReviewed": "2026-04-04",
+    "validators": {
+      "joiDescribeKeysMisuse": false,
+      "paginationMergedWith": "Joi.concat(paginationSchema) for searchBusesSchema and bookingQuerySchema"
+    },
+    "controllers": {
+      "successResponses": "auth, admin, and consumer handlers use { success: true, data } for 200/201"
+    }
+  },
+  "nonApi": [
+    { "method": "GET", "path": "/health", "auth": "none", "description": "Liveness" },
+    { "method": "GET", "path": "/uploads/*", "auth": "none", "description": "Static payment screenshots" }
+  ],
+  "routes": [
+    { "method": "POST", "path": "/api/auth/google", "auth": "none", "group": "auth" },
+    { "method": "POST", "path": "/api/auth/refresh-token", "auth": "none", "group": "auth" },
+    { "method": "POST", "path": "/api/auth/logout", "auth": "none", "group": "auth" },
+    { "method": "GET", "path": "/api/buses", "auth": "none", "group": "consumer" },
+    { "method": "GET", "path": "/api/buses/:id", "auth": "none", "group": "consumer" },
+    { "method": "GET", "path": "/api/poojas", "auth": "none", "group": "consumer" },
+    { "method": "GET", "path": "/api/poojas/:id", "auth": "none", "group": "consumer" },
+    { "method": "GET", "path": "/api/events", "auth": "none", "group": "consumer" },
+    { "method": "POST", "path": "/api/bookings", "auth": "bearer", "group": "consumer" },
+    { "method": "GET", "path": "/api/bookings", "auth": "bearer", "group": "consumer" },
+    { "method": "GET", "path": "/api/bookings/:id", "auth": "bearer", "group": "consumer" },
+    { "method": "POST", "path": "/api/poojas/:id/bookings", "auth": "bearer", "group": "consumer" },
+    { "method": "POST", "path": "/api/admin/events", "auth": "bearer+adminOrSuperuser", "group": "admin" },
+    { "method": "POST", "path": "/api/admin/trips", "auth": "bearer+adminOrSuperuser", "group": "admin" },
+    { "method": "POST", "path": "/api/admin/poojas", "auth": "bearer+adminOrSuperuser", "group": "admin" },
+    { "method": "GET", "path": "/api/admin/poojas", "auth": "bearer+adminOrSuperuser", "group": "admin" },
+    { "method": "GET", "path": "/api/admin/poojas/:id", "auth": "bearer+adminOrSuperuser", "group": "admin" },
+    { "method": "GET", "path": "/api/admin/buses", "auth": "bearer+adminOrSuperuser", "group": "admin" },
+    { "method": "GET", "path": "/api/admin/bookings", "auth": "bearer+adminOrSuperuser", "group": "admin" },
+    { "method": "PUT", "path": "/api/admin/bookings/:id/status", "auth": "bearer+adminOrSuperuser", "group": "admin" }
+  ],
+  "myBusAndroidRetrofit": {
+    "source": "MyBus/app/src/main/java/com/mybus/app/data/remote/ApiService.kt",
+    "pathsRelativeToApi": [
+      "auth/google",
+      "auth/refresh-token",
+      "auth/logout",
+      "admin/trips",
+      "admin/poojas",
+      "admin/events",
+      "admin/poojas",
+      "admin/poojas/{id}",
+      "poojas",
+      "poojas/{id}",
+      "poojas/{id}/bookings",
+      "events",
+      "buses",
+      "admin/buses",
+      "buses/{id}",
+      "bookings",
+      "bookings/{id}",
+      "admin/bookings",
+      "admin/bookings/{id}/status"
+    ]
+  }
+}

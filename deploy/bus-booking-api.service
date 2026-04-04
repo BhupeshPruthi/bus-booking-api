@@ -1,0 +1,19 @@
+# Example systemd unit — adjust paths and User.
+# Install: sudo cp deploy/bus-booking-api.service /etc/systemd/system/
+#          sudo systemctl daemon-reload && sudo systemctl enable --now bus-booking-api
+
+[Unit]
+Description=Bus Booking API
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/var/www/bus-booking-api
+EnvironmentFile=/etc/bus-booking-api.env
+ExecStart=/usr/bin/node src/app.js
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

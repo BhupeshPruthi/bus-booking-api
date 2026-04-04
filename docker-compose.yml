@@ -1,0 +1,39 @@
+# Production-style stack: API + PostgreSQL + persistent uploads
+# 1. Copy .env.example to .env and set JWT_SECRET, POSTGRES_PASSWORD, and:
+#    DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@db:5432/bus_booking
+# 2. docker compose up -d --build
+# 3. docker compose run --rm api npx knex migrate:latest --env production
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-bus_booking}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  api:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      - db
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      TRUST_PROXY: "1"
+      HOST: 0.0.0.0
+      PORT: "8080"
+    volumes:
+      - uploads_data:/app/uploads
+    ports:
+      - "8080:8080"
+
+volumes:
+  pgdata:
+  uploads_data:
