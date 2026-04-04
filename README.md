@@ -71,6 +71,21 @@ docker compose up -d --build
 docker compose run --rm api npx knex migrate:latest --env production
 ```
 
+### macOS: `docker: unknown command: docker compose`
+
+1. Install the Compose plugin: `brew install docker-compose`
+2. Tell Docker where the plugin lives — create or edit `~/.docker/config.json`:
+   ```json
+   {
+     "cliPluginsExtraDirs": ["/opt/homebrew/lib/docker/cli-plugins"]
+   }
+   ```
+   (Homebrew prints this path in the install “Caveats”.)
+3. **Start Docker Desktop** (or any engine that provides `/var/run/docker.sock`). If you see `connect: no such file or directory` for `docker.sock`, the daemon is not running.
+
+Alternatively use the standalone binary: `docker-compose up` (same `docker-compose.yml`).
+
+
 ### Docker: `Missing required environment variables: JWT_SECRET`
 
 The API sets `NODE_ENV=production` in Compose, so **`JWT_SECRET` must be set** (see [`src/config/index.js`](src/config/index.js)).
