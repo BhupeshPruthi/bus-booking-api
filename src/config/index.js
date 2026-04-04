@@ -1,4 +1,20 @@
+const fs = require('fs');
 require('dotenv').config();
+
+/**
+ * Production needs a real secret: env var and/or file (Docker/Kubernetes secrets).
+ */
+function resolveJwtSecret() {
+  const fromEnv = process.env.JWT_SECRET?.trim();
+  if (fromEnv) return fromEnv;
+  const filePath = process.env.JWT_SECRET_FILE?.trim();
+  if (filePath && fs.existsSync(filePath)) {
+    return fs.readFileSync(filePath, 'utf8').trim();
+  }
+  return undefined;
+}
+
+const jwtSecretResolved = resolveJwtSecret();
 
 const config = {
   env: process.env.NODE_ENV || 'development',
@@ -16,7 +32,7 @@ const config = {
   },
 
   jwt: {
-    secret: process.env.JWT_SECRET || 'dev-secret-key',
+    secret: jwtSecretResolved || 'dev-secret-key',
     expiresIn: process.env.JWT_EXPIRES_IN || '15m',
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '30d',
   },
@@ -52,12 +68,12 @@ const config = {
   },
 };
 
-// Validate required environment variables
-const requiredEnvVars = ['JWT_SECRET'];
-const missingEnvVars = requiredEnvVars.filter((envVar) => !process.env[envVar]);
-
-if (missingEnvVars.length > 0 && config.env === 'production') {
-  throw new Error(`Missing required environment variables: ${missingEnvVars.join(', ')}`);
+if (!jwtSecretResolved && config.env === 'production') {
+  throw new Error(
+    'Missing JWT secret in production. Set JWT_SECRET in the server environment (PaaS secrets, systemd, or .env). ' +
+      'Optional: JWT_SECRET_FILE=/path/to/file for Docker/Kubernetes secret files. ' +
+      'Generate: openssl rand -hex 32'
+  );
 }
 
 module.exports = config;
