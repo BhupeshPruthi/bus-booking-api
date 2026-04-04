@@ -1,6 +1,14 @@
 # Production-style stack: API + PostgreSQL + persistent uploads
-# 1. Copy .env.example to .env and set JWT_SECRET, POSTGRES_PASSWORD, and:
-#    DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@db:5432/bus_booking
+#
+# REQUIRED on the host: a .env file next to this file with at least:
+#   JWT_SECRET=<long random string>
+#   DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@db:5432/bus_booking
+#   POSTGRES_PASSWORD=<same password as in DATABASE_URL>
+#
+# Compose loads .env for variable substitution — JWT_SECRET must be set there
+# or `docker compose` will fail with a clear error.
+#
+# 1. cp .env.example .env  # then edit
 # 2. docker compose up -d --build
 # 3. docker compose run --rm api npx knex migrate:latest --env production
 
@@ -29,6 +37,8 @@ services:
       TRUST_PROXY: "1"
       HOST: 0.0.0.0
       PORT: "8080"
+      # Required by src/config/index.js in production — fail fast if missing from .env
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env (see .env.example)}
     volumes:
       - uploads_data:/app/uploads
     ports:

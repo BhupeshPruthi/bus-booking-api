@@ -71,6 +71,20 @@ docker compose up -d --build
 docker compose run --rm api npx knex migrate:latest --env production
 ```
 
+### Docker: `Missing required environment variables: JWT_SECRET`
+
+The API sets `NODE_ENV=production` in Compose, so **`JWT_SECRET` must be set** (see [`src/config/index.js`](src/config/index.js)).
+
+1. On the machine that runs Compose, create **`.env`** next to `docker-compose.yml` with a strong secret, e.g.  
+   `JWT_SECRET=$(openssl rand -hex 32)`  
+   (write the value into `.env` as `JWT_SECRET=...`).
+2. Ensure **`DATABASE_URL`** matches your Postgres password and host (`db` as hostname inside Compose).
+3. Redeploy: `docker compose up -d --build`.
+
+If you deploy **only the Dockerfile** (no Compose), pass the variable at run time:  
+`-e JWT_SECRET=your-secret` (and other env vars your host requires).
+
+
 ## API route list
 
 ```bash
