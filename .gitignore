@@ -36,8 +36,15 @@ build/
 *.bak
 *.tmp
 
-# Android app lives in a separate GitHub repository
-MyBus/
+# Android app generated/local files
+MyBus/.gradle/
+MyBus/.kotlin/
+MyBus/.idea/
+MyBus/build/
+MyBus/app/build/
+MyBus/local.properties
+MyBus/keystore.properties
+MyBus/*.jks
 
 # Cursor / local tooling
 .cursor/

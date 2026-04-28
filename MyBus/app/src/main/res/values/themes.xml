@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.MyBus" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!-- Cold start: real window background (Theme.SplashScreen API is color/icon-centric; drawable BG often stays white). -->
+    <style name="Theme.MyBus.Splash" parent="Theme.MyBus">
+        <item name="android:windowBackground">@drawable/splash_background</item>
+    </style>
+</resources>

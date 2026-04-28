@@ -1,0 +1,14 @@
+<resources>
+    <string name="app_name">BalajiSevak</string>
+    <string name="welcome_title">Welcome to BalajiSevak</string>
+    <string name="login_title">Log in to %1$s</string>
+    <string name="login_sign_in_google">Continue with Google</string>
+    <string name="login_legal_prefix">By proceeding, you agree to our</string>
+    <string name="login_terms">Terms</string>
+    <string name="login_and">\u0020and\u0020</string>
+    <string name="login_privacy_policy">Privacy Policy</string>
+    <string name="url_terms" translatable="false">https://policies.google.com/terms</string>
+    <string name="url_privacy" translatable="false">https://policies.google.com/privacy</string>
+    <!-- Fallback if BuildConfig is empty; prefer google.web.client.id in local.properties. Same as server GOOGLE_CLIENT_ID. -->
+    <string name="default_web_client_id" translatable="false">518619717532-foid6e38rrqhdna2l8gnn85m90fuk0dm.apps.googleusercontent.com</string>
+</resources>
