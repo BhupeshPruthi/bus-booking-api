@@ -140,6 +140,7 @@ class BookingService {
   async getBookingById(bookingId, userId = null) {
     let query = db('bookings')
       .join('buses', 'bookings.bus_id', 'buses.id')
+      .leftJoin('buses as return_bus', 'buses.return_bus_id', 'return_bus.id')
       .join('routes', 'buses.route_id', 'routes.id')
       .join('pickup_points', 'bookings.pickup_point_id', 'pickup_points.id')
       .join('users', 'bookings.user_id', 'users.id')
@@ -150,6 +151,7 @@ class BookingService {
         'buses.arrival_time',
         'buses.trip_type',
         'buses.price as unit_price',
+        'return_bus.arrival_time as return_arrival_time',
         'routes.name as route_name',
         'routes.source',
         'routes.destination',
@@ -182,6 +184,7 @@ class BookingService {
   async getUserBookings(userId, filters = {}) {
     let query = db('bookings')
       .join('buses', 'bookings.bus_id', 'buses.id')
+      .leftJoin('buses as return_bus', 'buses.return_bus_id', 'return_bus.id')
       .join('routes', 'buses.route_id', 'routes.id')
       .join('pickup_points', 'bookings.pickup_point_id', 'pickup_points.id')
       .select(
@@ -190,6 +193,7 @@ class BookingService {
         'buses.departure_time',
         'buses.arrival_time',
         'buses.trip_type',
+        'return_bus.arrival_time as return_arrival_time',
         'routes.name as route_name',
         'routes.source',
         'routes.destination',
@@ -227,6 +231,7 @@ class BookingService {
   async getAllBookings(filters = {}) {
     let query = db('bookings')
       .join('buses', 'bookings.bus_id', 'buses.id')
+      .leftJoin('buses as return_bus', 'buses.return_bus_id', 'return_bus.id')
       .join('routes', 'buses.route_id', 'routes.id')
       .join('pickup_points', 'bookings.pickup_point_id', 'pickup_points.id')
       .join('users', 'bookings.user_id', 'users.id')
@@ -236,6 +241,7 @@ class BookingService {
         'buses.departure_time',
         'buses.arrival_time',
         'buses.trip_type',
+        'return_bus.arrival_time as return_arrival_time',
         'routes.name as route_name',
         'routes.source',
         'routes.destination',
@@ -606,6 +612,7 @@ class BookingService {
         departureTime: booking.departure_time,
         arrivalTime: booking.arrival_time,
         tripType: booking.trip_type,
+        returnArrivalTime: booking.return_arrival_time || null,
       },
       route: {
         name: booking.route_name,
