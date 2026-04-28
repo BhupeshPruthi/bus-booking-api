@@ -104,6 +104,7 @@ const bookingQuerySchema = Joi.object({
     'pending',
     'payment_uploaded',
     'confirmed',
+    'cancellation_requested',
     'rejected',
     'expired',
     'cancelled'
@@ -113,6 +114,14 @@ const bookingQuerySchema = Joi.object({
   fromDate: Joi.date().iso(),
   toDate: Joi.date().iso(),
 }).concat(paginationSchema);
+
+const cancellationRequestSchema = Joi.object({
+  reason: Joi.string().max(500).allow('', null).trim(),
+});
+
+const adminCancelBookingSchema = Joi.object({
+  reason: Joi.string().max(500).allow('', null).trim(),
+});
 
 // ============ TRIP SCHEMAS ============
 
@@ -217,6 +226,8 @@ module.exports = {
   // Bookings
   createBookingSchema,
   bookingQuerySchema,
+  cancellationRequestSchema,
+  adminCancelBookingSchema,
 
   // Trips
   createTripSchema,

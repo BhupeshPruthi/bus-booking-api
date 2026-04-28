@@ -28,6 +28,7 @@
     { "method": "POST", "path": "/api/bookings", "auth": "bearer", "group": "consumer" },
     { "method": "GET", "path": "/api/bookings", "auth": "bearer", "group": "consumer" },
     { "method": "GET", "path": "/api/bookings/:id", "auth": "bearer", "group": "consumer" },
+    { "method": "POST", "path": "/api/bookings/:id/cancellation-request", "auth": "bearer", "group": "consumer" },
     { "method": "POST", "path": "/api/poojas/:id/bookings", "auth": "bearer", "group": "consumer" },
     { "method": "POST", "path": "/api/admin/events", "auth": "bearer+adminOrSuperuser", "group": "admin" },
     { "method": "POST", "path": "/api/admin/trips", "auth": "bearer+adminOrSuperuser", "group": "admin" },
@@ -36,7 +37,8 @@
     { "method": "GET", "path": "/api/admin/poojas/:id", "auth": "bearer+adminOrSuperuser", "group": "admin" },
     { "method": "GET", "path": "/api/admin/buses", "auth": "bearer+adminOrSuperuser", "group": "admin" },
     { "method": "GET", "path": "/api/admin/bookings", "auth": "bearer+adminOrSuperuser", "group": "admin" },
-    { "method": "PUT", "path": "/api/admin/bookings/:id/status", "auth": "bearer+adminOrSuperuser", "group": "admin" }
+    { "method": "PUT", "path": "/api/admin/bookings/:id/status", "auth": "bearer+adminOrSuperuser", "group": "admin" },
+    { "method": "POST", "path": "/api/admin/bookings/:id/cancel", "auth": "bearer+adminOrSuperuser", "group": "admin" }
   ],
   "myBusAndroidRetrofit": {
     "source": "MyBus/app/src/main/java/com/mybus/app/data/remote/ApiService.kt",
@@ -58,8 +60,10 @@
       "buses/{id}",
       "bookings",
       "bookings/{id}",
+      "bookings/{id}/cancellation-request",
       "admin/bookings",
-      "admin/bookings/{id}/status"
+      "admin/bookings/{id}/status",
+      "admin/bookings/{id}/cancel"
     ]
   }
 }

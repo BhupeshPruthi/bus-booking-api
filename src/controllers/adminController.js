@@ -26,6 +26,15 @@ const processBookingRequest = asyncHandler(async (req, res) => {
   res.json({ success: true, data: result });
 });
 
+const cancelBooking = asyncHandler(async (req, res) => {
+  const result = await bookingService.adminCancelBooking(
+    req.params.id,
+    req.user.id,
+    req.body.reason || null
+  );
+  res.json({ success: true, data: result });
+});
+
 const createTrip = asyncHandler(async (req, res) => {
   const result = await tripService.createTrip(req.body);
   res.status(201).json({ success: true, data: result });
@@ -55,6 +64,7 @@ module.exports = {
   getAllBuses,
   getAllBookings,
   processBookingRequest,
+  cancelBooking,
   createTrip,
   createPooja,
   getAdminPoojas,

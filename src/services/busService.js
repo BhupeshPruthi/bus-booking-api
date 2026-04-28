@@ -1,6 +1,8 @@
 const { db } = require('../config/database');
 const { NotFoundError, ValidationError } = require('../utils/errors');
 
+const ACTIVE_SEAT_STATUSES = ['pending', 'payment_uploaded', 'confirmed', 'cancellation_requested'];
+
 /** Max passengers that can be booked for this bus (seats seat_start..total_seats). */
 function bookableSeatCapacity(bus) {
   const start = bus.seat_start_number || 1;
@@ -262,10 +264,10 @@ class BusService {
       throw new NotFoundError('Bus');
     }
 
-    // Cancel all pending bookings for this bus
+    // Cancel all active bookings for this bus
     await db('bookings')
       .where('bus_id', busId)
-      .whereIn('status', ['pending', 'payment_uploaded'])
+      .whereIn('status', ACTIVE_SEAT_STATUSES)
       .update({ status: 'cancelled', updated_at: new Date() });
 
     return { message: 'Bus trip cancelled successfully' };
@@ -282,7 +284,7 @@ class BusService {
       .select('bus_id')
       .sum('seat_count as total')
       .whereIn('bus_id', busIds)
-      .whereIn('status', ['pending', 'payment_uploaded', 'confirmed'])
+      .whereIn('status', ACTIVE_SEAT_STATUSES)
       .groupBy('bus_id');
 
     return result.reduce((acc, row) => {

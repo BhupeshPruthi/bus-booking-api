@@ -5,6 +5,7 @@ const validate = require('../middlewares/validate');
 const {
   searchBusesSchema,
   createBookingSchema,
+  cancellationRequestSchema,
   bookPoojaTokenSchema,
 } = require('../validators/schemas');
 
@@ -70,6 +71,18 @@ router.get('/bookings', authenticate, consumerController.getMyBookings);
  * @access Consumer (own bookings only)
  */
 router.get('/bookings/:id', authenticate, consumerController.getBookingById);
+
+/**
+ * @route POST /api/bookings/:id/cancellation-request
+ * @desc Request cancellation for a confirmed booking
+ * @access Consumer (own bookings only)
+ */
+router.post(
+  '/bookings/:id/cancellation-request',
+  authenticate,
+  validate(cancellationRequestSchema),
+  consumerController.requestBookingCancellation
+);
 
 /**
  * @route POST /api/poojas/:id/bookings

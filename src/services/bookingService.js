@@ -1,7 +1,10 @@
 const { db } = require('../config/database');
 const { NotFoundError, ValidationError, ConflictError, ForbiddenError } = require('../utils/errors');
 
-const ACTIVE_SEAT_STATUSES = ['pending', 'payment_uploaded', 'confirmed'];
+const ACTIVE_SEAT_STATUSES = ['pending', 'payment_uploaded', 'confirmed', 'cancellation_requested'];
+const TERMINAL_BOOKING_STATUSES = ['rejected', 'expired', 'cancelled'];
+const USER_CANCELLATION_CUTOFF_HOURS = 48;
+const HOUR_MS = 60 * 60 * 1000;
 
 function parseAssignedSeats(value) {
   if (!value) return [];
@@ -387,22 +390,132 @@ class BookingService {
       throw new NotFoundError('Booking');
     }
 
-    const actionableStatuses = ['pending', 'payment_uploaded'];
-    if (!actionableStatuses.includes(booking.status)) {
-      throw new ValidationError(`Cannot ${action} booking with status: ${booking.status}`);
-    }
-
     if (action === 'approve') {
+      const actionableStatuses = ['pending', 'payment_uploaded'];
+      if (!actionableStatuses.includes(booking.status)) {
+        throw new ValidationError(`Cannot approve booking with status: ${booking.status}`);
+      }
+
       await db('bookings')
         .where('id', bookingId)
         .update({ status: 'confirmed', updated_at: new Date() });
     } else if (action === 'reject') {
+      const actionableStatuses = ['pending', 'payment_uploaded'];
+      if (!actionableStatuses.includes(booking.status)) {
+        throw new ValidationError(`Cannot reject booking with status: ${booking.status}`);
+      }
+
       await db('bookings')
         .where('id', bookingId)
         .update({ status: 'rejected', updated_at: new Date() });
+    } else if (action === 'approve_cancellation') {
+      if (booking.status !== 'cancellation_requested') {
+        throw new ValidationError(`Cannot approve cancellation for booking with status: ${booking.status}`);
+      }
+
+      await db('bookings')
+        .where('id', bookingId)
+        .update({
+          status: 'cancelled',
+          cancelled_at: new Date(),
+          cancelled_by: adminId,
+          updated_at: new Date(),
+        });
+    } else if (action === 'reject_cancellation') {
+      if (booking.status !== 'cancellation_requested') {
+        throw new ValidationError(`Cannot reject cancellation for booking with status: ${booking.status}`);
+      }
+
+      await db('bookings')
+        .where('id', bookingId)
+        .update({
+          status: booking.cancellation_previous_status || 'confirmed',
+          cancellation_rejection_reason: rejectionReason,
+          updated_at: new Date(),
+        });
     } else {
-      throw new ValidationError('Invalid action. Must be "approve" or "reject".');
+      throw new ValidationError(
+        'Invalid action. Must be "approve", "reject", "approve_cancellation", or "reject_cancellation".'
+      );
     }
+
+    return this.getBookingById(bookingId);
+  }
+
+  /**
+   * Consumer: request cancellation for a confirmed booking.
+   * The seat remains occupied until an admin approves the request.
+   */
+  async requestCancellation(bookingId, userId, reason = null) {
+    const id = await db.transaction(async (trx) => {
+      const booking = await trx('bookings')
+        .join('buses', 'bookings.bus_id', 'buses.id')
+        .select('bookings.*', 'buses.departure_time')
+        .where('bookings.id', bookingId)
+        .where('bookings.user_id', userId)
+        .forUpdate()
+        .first();
+
+      if (!booking) {
+        throw new NotFoundError('Booking');
+      }
+
+      if (booking.status === 'cancellation_requested') {
+        return booking.id;
+      }
+
+      if (booking.status !== 'confirmed') {
+        throw new ValidationError(`Cannot request cancellation for booking with status: ${booking.status}`);
+      }
+
+      const departureTime = new Date(booking.departure_time);
+      const cutoffTime = Date.now() + USER_CANCELLATION_CUTOFF_HOURS * HOUR_MS;
+      if (!Number.isFinite(departureTime.getTime()) || departureTime.getTime() < cutoffTime) {
+        throw new ValidationError(
+          `Cancellation requests are allowed only until ${USER_CANCELLATION_CUTOFF_HOURS} hours before departure`
+        );
+      }
+
+      await trx('bookings')
+        .where('id', bookingId)
+        .update({
+          status: 'cancellation_requested',
+          cancellation_requested_at: new Date(),
+          cancellation_reason: reason,
+          cancellation_previous_status: booking.status,
+          cancellation_rejection_reason: null,
+          updated_at: new Date(),
+        });
+
+      return booking.id;
+    });
+
+    return this.getBookingById(id, userId);
+  }
+
+  /**
+   * Admin: directly cancel any active booking at any time.
+   */
+  async adminCancelBooking(bookingId, adminId, reason = null) {
+    const booking = await db('bookings').where('id', bookingId).first();
+
+    if (!booking) {
+      throw new NotFoundError('Booking');
+    }
+
+    if (TERMINAL_BOOKING_STATUSES.includes(booking.status)) {
+      throw new ValidationError(`Cannot cancel booking with status: ${booking.status}`);
+    }
+
+    await db('bookings')
+      .where('id', bookingId)
+      .update({
+        status: 'cancelled',
+        cancellation_reason: reason || booking.cancellation_reason || null,
+        cancelled_at: new Date(),
+        cancelled_by: adminId,
+        updated_at: new Date(),
+      });
 
     return this.getBookingById(bookingId);
   }
@@ -467,6 +580,10 @@ class BookingService {
       passengerNames: booking.passenger_names,
       totalAmount: parseFloat(booking.total_amount),
       status: booking.status,
+      cancellationRequestedAt: booking.cancellation_requested_at,
+      cancellationReason: booking.cancellation_reason,
+      cancellationRejectionReason: booking.cancellation_rejection_reason,
+      cancelledAt: booking.cancelled_at,
       holdExpiresAt: booking.hold_expires_at,
       createdAt: booking.created_at,
       bus: {

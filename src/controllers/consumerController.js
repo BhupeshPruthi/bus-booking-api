@@ -49,6 +49,15 @@ const getBookingById = asyncHandler(async (req, res) => {
   res.json({ success: true, data: result });
 });
 
+const requestBookingCancellation = asyncHandler(async (req, res) => {
+  const result = await bookingService.requestCancellation(
+    req.params.id,
+    req.user.id,
+    req.body.reason || null
+  );
+  res.json({ success: true, data: result });
+});
+
 module.exports = {
   searchBuses,
   getBusDetails,
@@ -59,4 +68,5 @@ module.exports = {
   createBooking,
   getMyBookings,
   getBookingById,
+  requestBookingCancellation,
 };

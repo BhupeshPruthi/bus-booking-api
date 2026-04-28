@@ -5,6 +5,7 @@ const { adminOrSuperUser } = require('../middlewares/authorize');
 const validate = require('../middlewares/validate');
 const {
   bookingQuerySchema,
+  adminCancelBookingSchema,
   createTripSchema,
   createPoojaSchema,
   createEventSchema,
@@ -76,5 +77,16 @@ router.get('/bookings', validate(bookingQuerySchema, 'query'), adminController.g
  * @access Admin
  */
 router.put('/bookings/:id/status', adminController.processBookingRequest);
+
+/**
+ * @route POST /api/admin/bookings/:id/cancel
+ * @desc Admin direct cancellation for any active booking
+ * @access Admin
+ */
+router.post(
+  '/bookings/:id/cancel',
+  validate(adminCancelBookingSchema),
+  adminController.cancelBooking
+);
 
 module.exports = router;
