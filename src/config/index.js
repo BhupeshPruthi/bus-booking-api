@@ -15,6 +15,10 @@ function resolveJwtSecret() {
 }
 
 const jwtSecretResolved = resolveJwtSecret();
+const googleClientIds = (process.env.GOOGLE_CLIENT_IDS || process.env.GOOGLE_CLIENT_ID || '')
+  .split(',')
+  .map((id) => id.trim())
+  .filter(Boolean);
 
 const config = {
   env: process.env.NODE_ENV || 'development',
@@ -59,7 +63,9 @@ const config = {
 
   google: {
     /** OAuth 2.0 Web client ID (used to verify Android ID tokens) */
-    clientId: process.env.GOOGLE_CLIENT_ID || '',
+    clientId: googleClientIds[0] || '',
+    /** Optional comma-separated list for migration between Web client IDs */
+    clientIds: googleClientIds,
   },
 
   upload: {

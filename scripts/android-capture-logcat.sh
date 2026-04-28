@@ -29,7 +29,7 @@ fi
   adb devices -l 2>&1 || true
   echo ""
   echo "=== Lines: BalajiSevak [AUTH] / OkHttp / AndroidRuntime / FATAL ==="
-  "${ADB[@]}" logcat -d -t 20000 2>&1 | grep -E 'BalajiSevak|BalajiSevakOkHttp|AndroidRuntime|FATAL EXCEPTION|com\.balajiMandal\.BalajiSevak|\[AUTH\]' | tail -n 1500 || true
+  "${ADB[@]}" logcat -d -t 20000 2>&1 | grep -E 'BalajiSevak|BalajiSevakOkHttp|AndroidRuntime|FATAL EXCEPTION|com\.bolguru\.balajisevak|\[AUTH\]' | tail -n 1500 || true
 } > "$OUT"
 
 echo "Wrote: $OUT"

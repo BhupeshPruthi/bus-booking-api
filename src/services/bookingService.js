@@ -1,85 +1,133 @@
 const { db } = require('../config/database');
 const { NotFoundError, ValidationError, ConflictError, ForbiddenError } = require('../utils/errors');
-const busService = require('./busService');
+
+const ACTIVE_SEAT_STATUSES = ['pending', 'payment_uploaded', 'confirmed'];
+
+function parseAssignedSeats(value) {
+  if (!value) return [];
+  return String(value)
+    .split(',')
+    .map((seat) => parseInt(seat.trim(), 10))
+    .filter((seat) => Number.isInteger(seat));
+}
+
+function reserveFirstAvailableSeats(occupiedSeats, count, seatStart, totalSeats) {
+  const seats = [];
+  for (let seat = seatStart; seat <= totalSeats && seats.length < count; seat += 1) {
+    if (!occupiedSeats.has(seat)) {
+      occupiedSeats.add(seat);
+      seats.push(seat);
+    }
+  }
+  return seats;
+}
+
+function collectOccupiedSeats(bookings, seatStart, totalSeats) {
+  const occupiedSeats = new Set();
+
+  bookings.forEach((booking) => {
+    const assignedSeats = parseAssignedSeats(booking.assigned_seats)
+      .filter((seat) => seat >= seatStart && seat <= totalSeats);
+
+    if (assignedSeats.length > 0) {
+      assignedSeats.forEach((seat) => occupiedSeats.add(seat));
+      return;
+    }
+
+    // Compatibility for older rows that may not have assigned_seats populated.
+    reserveFirstAvailableSeats(
+      occupiedSeats,
+      parseInt(booking.seat_count || 0, 10),
+      seatStart,
+      totalSeats
+    );
+  });
+
+  return occupiedSeats;
+}
 
 class BookingService {
   /**
    * Create a new booking
    */
   async createBooking(userId, data) {
-    // Get bus details
-    const bus = await db('buses').where('id', data.busId).first();
-    if (!bus) {
-      throw new NotFoundError('Bus');
-    }
+    const bookingId = await db.transaction(async (trx) => {
+      // Lock the bus row so concurrent bookings cannot choose the same free seats.
+      const bus = await trx('buses').where('id', data.busId).forUpdate().first();
+      if (!bus) {
+        throw new NotFoundError('Bus');
+      }
 
-    // Check if bus is available for booking
-    if (bus.status !== 'scheduled') {
-      throw new ValidationError('This bus is not available for booking');
-    }
+      // Check if bus is available for booking
+      if (bus.status !== 'scheduled') {
+        throw new ValidationError('This bus is not available for booking');
+      }
 
-    if (new Date(bus.departure_time) <= new Date()) {
-      throw new ValidationError('Cannot book a bus that has already departed');
-    }
+      if (new Date(bus.departure_time) <= new Date()) {
+        throw new ValidationError('Cannot book a bus that has already departed');
+      }
 
-    // Verify pickup point belongs to this specific bus
-    const pickupPoint = await db('pickup_points')
-      .where('id', data.pickupPointId)
-      .where('bus_id', data.busId)
-      .first();
+      // Verify pickup point belongs to this specific bus
+      const pickupPoint = await trx('pickup_points')
+        .where('id', data.pickupPointId)
+        .where('bus_id', data.busId)
+        .first();
 
-    if (!pickupPoint) {
-      throw new ValidationError('Invalid pickup point for this bus');
-    }
+      if (!pickupPoint) {
+        throw new ValidationError('Invalid pickup point for this bus');
+      }
 
-    // Check seat availability
-    const bookedSeats = await busService.getBookedSeatsCount([data.busId]);
-    const currentBooked = bookedSeats[data.busId] || 0;
-    const availableSeats = bus.total_seats - currentBooked;
+      const seatStart = bus.seat_start_number || 1;
+      const activeBookings = await trx('bookings')
+        .where('bus_id', data.busId)
+        .whereIn('status', ACTIVE_SEAT_STATUSES)
+        .orderBy('created_at', 'asc')
+        .select('assigned_seats', 'seat_count');
 
-    if (data.seatCount > availableSeats) {
-      throw new ConflictError(`Only ${availableSeats} seats available. Requested: ${data.seatCount}`);
-    }
+      const occupiedSeats = collectOccupiedSeats(activeBookings, seatStart, bus.total_seats);
+      const availableSeats = Math.max(0, bus.total_seats - seatStart + 1 - occupiedSeats.size);
+      if (data.seatCount > availableSeats) {
+        throw new ConflictError(`Only ${availableSeats} seats available. Requested: ${data.seatCount}`);
+      }
 
-    // Calculate total amount
-    const totalAmount = parseFloat(bus.price) * data.seatCount;
+      const seatNumbers = reserveFirstAvailableSeats(
+        occupiedSeats,
+        data.seatCount,
+        seatStart,
+        bus.total_seats
+      );
 
-    // Bookings stay pending until admin acts — set far-future hold
-    const holdExpiresAt = new Date('2099-12-31T23:59:59Z');
+      if (seatNumbers.length < data.seatCount) {
+        throw new ConflictError(`Only ${availableSeats} seats available. Requested: ${data.seatCount}`);
+      }
 
-    // Calculate assigned seat numbers
-    const seatStart = bus.seat_start_number || 1;
-    const totalBooked = await db('bookings')
-      .where('bus_id', data.busId)
-      .whereIn('status', ['pending', 'payment_uploaded', 'confirmed'])
-      .sum('seat_count as total')
-      .first();
-    const alreadyBooked = parseInt(totalBooked?.total || 0, 10);
-    const firstSeat = seatStart + alreadyBooked;
-    const seatNumbers = Array.from(
-      { length: data.seatCount },
-      (_, i) => firstSeat + i
-    );
-    const assignedSeats = seatNumbers.join(',');
+      // Calculate total amount
+      const totalAmount = parseFloat(bus.price) * data.seatCount;
 
-    // Create booking
-    const [booking] = await db('bookings')
-      .insert({
-        user_id: userId,
-        bus_id: data.busId,
-        pickup_point_id: data.pickupPointId,
-        seat_count: data.seatCount,
-        passenger_name: data.passengerName || null,
-        passenger_phone: data.passengerPhone || null,
-        passenger_names: data.passengerNames || null,
-        total_amount: totalAmount,
-        assigned_seats: assignedSeats,
-        status: 'pending',
-        hold_expires_at: holdExpiresAt,
-      })
-      .returning('*');
+      // Bookings stay pending until admin acts — set far-future hold
+      const holdExpiresAt = new Date('2099-12-31T23:59:59Z');
 
-    return this.getBookingById(booking.id, userId);
+      // Create booking
+      const [booking] = await trx('bookings')
+        .insert({
+          user_id: userId,
+          bus_id: data.busId,
+          pickup_point_id: data.pickupPointId,
+          seat_count: data.seatCount,
+          passenger_name: data.passengerName || null,
+          passenger_phone: data.passengerPhone || null,
+          passenger_names: data.passengerNames || null,
+          total_amount: totalAmount,
+          assigned_seats: seatNumbers.join(','),
+          status: 'pending',
+          hold_expires_at: holdExpiresAt,
+        })
+        .returning('*');
+
+      return booking.id;
+    });
+
+    return this.getBookingById(bookingId, userId);
   }
 
   /**
@@ -95,6 +143,8 @@ class BookingService {
         'bookings.*',
         'buses.bus_name',
         'buses.departure_time',
+        'buses.arrival_time',
+        'buses.trip_type',
         'buses.price as unit_price',
         'routes.name as route_name',
         'routes.source',
@@ -134,6 +184,8 @@ class BookingService {
         'bookings.*',
         'buses.bus_name',
         'buses.departure_time',
+        'buses.arrival_time',
+        'buses.trip_type',
         'routes.name as route_name',
         'routes.source',
         'routes.destination',
@@ -178,6 +230,8 @@ class BookingService {
         'bookings.*',
         'buses.bus_name',
         'buses.departure_time',
+        'buses.arrival_time',
+        'buses.trip_type',
         'routes.name as route_name',
         'routes.source',
         'routes.destination',
@@ -418,6 +472,8 @@ class BookingService {
       bus: {
         name: booking.bus_name,
         departureTime: booking.departure_time,
+        arrivalTime: booking.arrival_time,
+        tripType: booking.trip_type,
       },
       route: {
         name: booking.route_name,

@@ -6,23 +6,54 @@ const config = require('../config');
 const { UnauthorizedError, ValidationError } = require('../utils/errors');
 const logger = require('../utils/logger');
 
+function maskGoogleClientId(value) {
+  if (!value) return undefined;
+  const str = String(value);
+  if (str.length <= 18) return '<redacted>';
+  return `${str.slice(0, 12)}...${str.slice(-31)}`;
+}
+
+function decodeJwtPayload(idToken) {
+  const parts = String(idToken || '').split('.');
+  if (parts.length < 2) return null;
+  try {
+    return JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+  } catch (_e) {
+    return null;
+  }
+}
+
 class AuthService {
   /**
    * Verify Google ID token and return Google profile fields
    */
   async verifyGoogleIdToken(idToken) {
-    if (!config.google.clientId) {
+    const allowedClientIds = config.google.clientIds || [];
+    if (allowedClientIds.length === 0) {
       throw new ValidationError('Google Sign-In is not configured (GOOGLE_CLIENT_ID)');
     }
-    const client = new OAuth2Client(config.google.clientId);
+    const client = new OAuth2Client(allowedClientIds[0]);
     let ticket;
     try {
       ticket = await client.verifyIdToken({
         idToken,
-        audience: config.google.clientId,
+        audience: allowedClientIds,
       });
     } catch (e) {
-      logger.warn('Google ID token verification failed', { message: e.message });
+      const payload = decodeJwtPayload(idToken);
+      logger.warn('Google ID token verification failed', {
+        message: e.message,
+        expectedAudiences: allowedClientIds.map(maskGoogleClientId),
+        token: payload
+          ? {
+              aud: maskGoogleClientId(payload.aud),
+              azp: maskGoogleClientId(payload.azp),
+              iss: payload.iss,
+              emailVerified: payload.email_verified,
+              exp: payload.exp ? new Date(payload.exp * 1000).toISOString() : undefined,
+            }
+          : undefined,
+      });
       throw new UnauthorizedError('Invalid Google sign-in token');
     }
     const payload = ticket.getPayload();
