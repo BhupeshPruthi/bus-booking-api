@@ -6,7 +6,7 @@ builder = "nixpacks"
 
 [deploy]
 # Use npx knex directly so deploy works even if package.json lacks migrate:prod (older commits).
-preDeployCommand = ["npx", "knex", "migrate:latest", "--env", "production"]
+preDeployCommand = "npx knex migrate:latest --env production"
 startCommand = "npm start"
 healthcheckPath = "/health"
 healthcheckTimeout = 100
