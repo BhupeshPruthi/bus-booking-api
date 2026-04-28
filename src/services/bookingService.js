@@ -3,6 +3,7 @@ const { NotFoundError, ValidationError, ConflictError, ForbiddenError } = requir
 
 const ACTIVE_SEAT_STATUSES = ['pending', 'payment_uploaded', 'confirmed', 'cancellation_requested'];
 const TERMINAL_BOOKING_STATUSES = ['rejected', 'expired', 'cancelled'];
+const USER_IMMEDIATE_CANCELLATION_STATUSES = ['pending', 'payment_uploaded'];
 const USER_CANCELLATION_CUTOFF_HOURS = 48;
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -443,8 +444,8 @@ class BookingService {
   }
 
   /**
-   * Consumer: request cancellation for a confirmed booking.
-   * The seat remains occupied until an admin approves the request.
+   * Consumer: cancel an unconfirmed booking immediately, or request cancellation
+   * for a confirmed booking. Confirmed seats remain occupied until admin approval.
    */
   async requestCancellation(bookingId, userId, reason = null) {
     const id = await db.transaction(async (trx) => {
@@ -464,8 +465,22 @@ class BookingService {
         return booking.id;
       }
 
+      if (USER_IMMEDIATE_CANCELLATION_STATUSES.includes(booking.status)) {
+        await trx('bookings')
+          .where('id', bookingId)
+          .update({
+            status: 'cancelled',
+            cancellation_reason: reason,
+            cancelled_at: new Date(),
+            cancelled_by: userId,
+            updated_at: new Date(),
+          });
+
+        return booking.id;
+      }
+
       if (booking.status !== 'confirmed') {
-        throw new ValidationError(`Cannot request cancellation for booking with status: ${booking.status}`);
+        throw new ValidationError(`Cannot cancel booking with status: ${booking.status}`);
       }
 
       const departureTime = new Date(booking.departure_time);
