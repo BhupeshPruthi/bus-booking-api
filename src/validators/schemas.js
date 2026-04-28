@@ -135,17 +135,23 @@ const createTripSchema = Joi.object({
   contactPhone: Joi.string().max(20).required().trim(),
   tripType: Joi.string().valid('one_way', 'round_trip').required(),
   stops: Joi.array().items(stopSchema).min(0).default([]),
-  returnDepartureTime: Joi.date().iso().greater('now').when('tripType', {
+  returnDepartureTime: Joi.when('tripType', {
     is: 'round_trip',
-    then: Joi.required(),
+    then: Joi.date()
+      .iso()
+      .min(Joi.ref('departureTime'))
+      .optional()
+      .messages({
+        'date.min': 'Return departure cannot be before trip departure',
+      }),
     otherwise: Joi.forbidden(),
   }),
-  returnArrivalTime: Joi.date().iso().greater(Joi.ref('returnDepartureTime')).when('tripType', {
+  returnArrivalTime: Joi.when('tripType', {
     is: 'round_trip',
-    then: Joi.required(),
+    then: Joi.date().iso().min(Joi.ref('departureTime')).optional().messages({
+      'date.min': 'Return arrival cannot be before trip departure',
+    }),
     otherwise: Joi.forbidden(),
-  }).messages({
-    'date.greater': 'Return arrival time must be after return departure time',
   }),
 });
 

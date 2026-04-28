@@ -1,6 +1,12 @@
 const { db } = require('../config/database');
 const { NotFoundError, ValidationError } = require('../utils/errors');
 
+/** Max passengers that can be booked for this bus (seats seat_start..total_seats). */
+function bookableSeatCapacity(bus) {
+  const start = bus.seat_start_number || 1;
+  return Math.max(0, bus.total_seats - start + 1);
+}
+
 class BusService {
   /**
    * Create a new bus trip
@@ -78,7 +84,10 @@ class BusService {
         destination: bus.destination,
       },
       bookedSeats: bookedSeats[bus.id] || 0,
-      availableSeats: bus.total_seats - (bookedSeats[bus.id] || 0),
+      availableSeats: Math.max(
+        0,
+        bookableSeatCapacity(bus) - (bookedSeats[bus.id] || 0)
+      ),
     }));
 
     return this.enrichWithReturnTimes(formatted);
@@ -142,7 +151,10 @@ class BusService {
         destination: bus.destination,
       },
       bookedSeats: bookedSeats[bus.id] || 0,
-      availableSeats: bus.total_seats - (bookedSeats[bus.id] || 0),
+      availableSeats: Math.max(
+        0,
+        bookableSeatCapacity(bus) - (bookedSeats[bus.id] || 0)
+      ),
     }));
 
     return this.enrichWithReturnTimes(formatted);
@@ -174,9 +186,24 @@ class BusService {
 
     // Get booked seats count
     const bookedSeats = await this.getBookedSeatsCount([busId]);
+    let returnTimes = {};
+    if (bus.trip_type === 'round_trip' && bus.return_bus_id) {
+      const returnBus = await db('buses')
+        .select('departure_time', 'arrival_time')
+        .where('id', bus.return_bus_id)
+        .first();
+
+      if (returnBus) {
+        returnTimes = {
+          returnDepartureTime: returnBus.departure_time,
+          returnArrivalTime: returnBus.arrival_time,
+        };
+      }
+    }
 
     return {
       ...this.formatBus(bus),
+      ...returnTimes,
       route: {
         id: bus.route_id,
         name: bus.route_name,
@@ -190,7 +217,10 @@ class BusService {
         sequence: pp.sequence,
       })),
       bookedSeats: bookedSeats[busId] || 0,
-      availableSeats: bus.total_seats - (bookedSeats[busId] || 0),
+      availableSeats: Math.max(
+        0,
+        bookableSeatCapacity(bus) - (bookedSeats[busId] || 0)
+      ),
     };
   }
 

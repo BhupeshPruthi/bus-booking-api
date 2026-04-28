@@ -49,6 +49,8 @@ class TripService {
         // Reverse the stops for the return route — attached to return bus below
 
         const returnRouteName = `${data.destination} to ${data.source}`;
+        const returnDepartureTime = data.returnDepartureTime || data.departureTime;
+        const returnArrivalTime = data.returnArrivalTime || data.arrivalTime;
         const [returnBusRow] = await trx('buses')
           .insert({
             route_id: returnRoute.id,
@@ -56,8 +58,8 @@ class TripService {
             total_seats: data.totalSeats,
             seat_start_number: data.seatStartNumber || 1,
             price: data.price,
-            departure_time: data.returnDepartureTime,
-            arrival_time: data.returnArrivalTime,
+            departure_time: returnDepartureTime,
+            arrival_time: returnArrivalTime,
             contact_name: data.contactName,
             contact_phone: data.contactPhone,
             trip_type: 'round_trip',
