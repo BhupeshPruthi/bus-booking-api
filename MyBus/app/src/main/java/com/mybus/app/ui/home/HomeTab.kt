@@ -257,9 +257,9 @@ private fun UpcomingEventCard(
                 contentDescription = event.header,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(16f / 9f)
+                    .aspectRatio(1600f / 1066f)
                     .clip(bannerTopShape),
-                contentScale = ContentScale.Crop,
+                contentScale = ContentScale.Fit,
             )
             Column(
                 Modifier.padding(12.dp),
