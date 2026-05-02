@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.EventSeat
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -29,6 +30,7 @@ import com.mybus.app.ui.home.HomeViewModel
 import com.mybus.app.ui.theme.AppOutlinedPillReadOnly
 import com.mybus.app.ui.util.formatBusScheduleDateTime
 import com.mybus.app.ui.util.formatRouteTitle
+import com.mybus.app.ui.util.seatAvailability
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,6 +44,17 @@ fun BusTab(
 
     LaunchedEffect(Unit) {
         viewModel.loadBuses()
+    }
+
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                viewModel.loadBuses()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     Scaffold(
@@ -204,6 +217,7 @@ private fun ConsumerBusCard(bus: BusListItem, onClick: () -> Unit) {
 
 @Composable
 private fun SeatAvailabilityLine(bus: BusListItem) {
+    val availability = bus.seatAvailability()
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(
             Icons.Filled.EventSeat,
@@ -213,7 +227,7 @@ private fun SeatAvailabilityLine(bus: BusListItem) {
         )
         Spacer(Modifier.width(6.dp))
         Text(
-            text = "${bus.availableSeats} available / ${bus.totalSeats} total",
+            text = "${availability.availableSeats} available / ${availability.bookableSeats} seats",
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurfaceVariant

@@ -23,6 +23,7 @@ import com.mybus.app.ui.components.StopListTimeline
 import com.mybus.app.ui.components.StopTimelineDisplay
 import com.mybus.app.ui.util.formatBusScheduleDateTimeFull
 import com.mybus.app.ui.util.formatRouteTitle
+import com.mybus.app.ui.util.seatAvailability
 
 private val DetailRowIconSize = 20.dp
 
@@ -50,7 +51,8 @@ fun BusDetailScreen(
         },
         bottomBar = {
             state.bus?.let { bus ->
-                if (bus.availableSeats > 0) {
+                val availability = bus.seatAvailability()
+                if (availability.availableSeats > 0) {
                     Surface(tonalElevation = 3.dp) {
                         Row(
                             modifier = Modifier
@@ -68,7 +70,7 @@ fun BusDetailScreen(
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = "${bus.availableSeats} seats left",
+                                    text = "${availability.availableSeats} seats left",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -186,6 +188,7 @@ fun BusDetailScreen(
 
 @Composable
 private fun BusDetailContent(bus: BusDetailData, modifier: Modifier = Modifier) {
+    val availability = bus.seatAvailability()
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
@@ -243,7 +246,7 @@ private fun BusDetailContent(bus: BusDetailData, modifier: Modifier = Modifier) 
                     DetailRow(
                         icon = Icons.Filled.EventSeat,
                         label = "Seats",
-                        value = "${bus.availableSeats} available / ${bus.totalSeats} total",
+                        value = "${availability.availableSeats} available / ${availability.bookableSeats} seats",
                         iconTint = journeyIconTint
                     )
                 }
@@ -343,6 +346,7 @@ private fun BookingDialog(
     onDismiss: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val availability = bus.seatAvailability()
 
     AlertDialog(
         onDismissRequest = { if (!isBooking) onDismiss() },
@@ -387,7 +391,7 @@ private fun BookingDialog(
                     )
                     IconButton(
                         onClick = { onSeatCountChange(seatCount + 1) },
-                        enabled = seatCount < bus.availableSeats
+                        enabled = seatCount < availability.availableSeats
                     ) { Icon(Icons.Filled.Add, "Increase") }
                 }
 

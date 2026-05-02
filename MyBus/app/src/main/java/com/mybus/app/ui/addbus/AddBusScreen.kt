@@ -174,14 +174,14 @@ fun AddBusScreen(
             }
             val totalInt = uiState.totalSeats.toIntOrNull()
             val reservedInt = uiState.reservedSeatsFromStart.toIntOrNull() ?: 0
-            val bookable = if (totalInt != null && reservedInt >= 0 && reservedInt < totalInt) {
+            val seatsForSale = if (totalInt != null && reservedInt >= 0 && reservedInt < totalInt) {
                 totalInt - reservedInt
             } else {
                 null
             }
-            if (bookable != null) {
+            if (seatsForSale != null) {
                 Text(
-                    text = "Up to $bookable seat(s) can be booked (sales from seat #${reservedInt + 1} to #$totalInt).",
+                    text = "Up to $seatsForSale seat(s) can be booked (sales from seat #${reservedInt + 1} to #$totalInt).",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.fillMaxWidth()

@@ -9,6 +9,7 @@ data class BusListItem(
     @Json(name = "routeId") val routeId: String,
     @Json(name = "busName") val busName: String,
     @Json(name = "totalSeats") val totalSeats: Int,
+    @Json(name = "seatStartNumber") val seatStartNumber: Int = 1,
     @Json(name = "price") val price: Double,
     @Json(name = "departureTime") val departureTime: String,
     @Json(name = "arrivalTime") val arrivalTime: String?,
@@ -21,7 +22,8 @@ data class BusListItem(
     @Json(name = "status") val status: String,
     @Json(name = "route") val route: BusRouteInfo,
     @Json(name = "bookedSeats") val bookedSeats: Int,
-    @Json(name = "availableSeats") val availableSeats: Int
+    @Json(name = "availableSeats") val availableSeats: Int,
+    @Json(name = "bookableSeats") val bookableSeats: Int? = null
 )
 
 @JsonClass(generateAdapter = true)
@@ -46,6 +48,7 @@ data class BusDetailData(
     @Json(name = "routeId") val routeId: String,
     @Json(name = "busName") val busName: String,
     @Json(name = "totalSeats") val totalSeats: Int,
+    @Json(name = "seatStartNumber") val seatStartNumber: Int = 1,
     @Json(name = "price") val price: Double,
     @Json(name = "departureTime") val departureTime: String,
     @Json(name = "arrivalTime") val arrivalTime: String?,
@@ -59,7 +62,8 @@ data class BusDetailData(
     @Json(name = "route") val route: BusRouteInfo,
     @Json(name = "pickupPoints") val pickupPoints: List<PickupPointInfo>,
     @Json(name = "bookedSeats") val bookedSeats: Int,
-    @Json(name = "availableSeats") val availableSeats: Int
+    @Json(name = "availableSeats") val availableSeats: Int,
+    @Json(name = "bookableSeats") val bookableSeats: Int? = null
 )
 
 @JsonClass(generateAdapter = true)

@@ -31,6 +31,7 @@ import com.mybus.app.data.remote.dto.BookingData
 import com.mybus.app.data.remote.dto.BusDetailData
 import com.mybus.app.ui.util.formatBusScheduleDateTimeFull
 import com.mybus.app.ui.util.formatRouteTitle
+import com.mybus.app.ui.util.seatAvailabilityFromBookings
 import java.io.File
 import java.io.FileOutputStream
 
@@ -53,6 +54,9 @@ fun AdminBusDetailScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { viewModel.loadAll() }) {
+                        Icon(Icons.Filled.Refresh, contentDescription = "Refresh bookings")
+                    }
                     if (state.bookings.isNotEmpty()) {
                         TextButton(onClick = { exportBookings(context, state.bus, state.bookings) }) {
                             Icon(Icons.Filled.Share, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -98,7 +102,7 @@ fun AdminBusDetailScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         state.bus?.let { bus ->
-                            item { BusSummaryCard(bus) }
+                            item { BusSummaryCard(bus, state.bookings) }
                         }
 
                         item {
@@ -110,7 +114,44 @@ fun AdminBusDetailScreen(
                             )
                         }
 
-                        if (state.bookings.isEmpty() && !state.bookingsLoading) {
+                        state.bookingsError?.let { message ->
+                            item {
+                                ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                                    Column(
+                                        Modifier.fillMaxWidth().padding(16.dp),
+                                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                Icons.Filled.ErrorOutline,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.error,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                            Spacer(Modifier.width(8.dp))
+                                            Text(
+                                                "Could not load all booking requests",
+                                                style = MaterialTheme.typography.titleSmall,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = MaterialTheme.colorScheme.error
+                                            )
+                                        }
+                                        Text(
+                                            message,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        OutlinedButton(onClick = { viewModel.loadBookings() }) {
+                                            Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(Modifier.width(6.dp))
+                                            Text("Retry")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if (state.bookings.isEmpty() && !state.bookingsLoading && state.bookingsError == null) {
                             item {
                                 Card(modifier = Modifier.fillMaxWidth()) {
                                     Column(
@@ -125,7 +166,7 @@ fun AdminBusDetailScreen(
                                         )
                                         Spacer(Modifier.height(8.dp))
                                         Text(
-                                            "No bookings yet",
+                                            "No booking requests yet",
                                             style = MaterialTheme.typography.bodyMedium,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -155,7 +196,7 @@ fun AdminBusDetailScreen(
 }
 
 @Composable
-private fun BusSummaryCard(bus: BusDetailData) {
+private fun BusSummaryCard(bus: BusDetailData, bookings: List<BookingData>) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
             Text(
@@ -175,9 +216,14 @@ private fun BusSummaryCard(bus: BusDetailData) {
             finalArrival?.let {
                 SummaryRow(Icons.Filled.FlightLand, "Arrival", formatDateTimeFull(it))
             }
+            val availability = bus.seatAvailabilityFromBookings(bookings)
             SummaryRow(
                 Icons.Filled.EventSeat, "Seats",
-                "${bus.availableSeats} available / ${bus.totalSeats} total"
+                "${availability.availableSeats} available / ${availability.bookableSeats} seats"
+            )
+            SummaryRow(
+                Icons.Filled.ConfirmationNumber, "Requested",
+                "${availability.reservedSeats} requested / ${availability.totalSeats} total"
             )
             SummaryRow(
                 Icons.Filled.CurrencyRupee, "Price",
@@ -243,6 +289,15 @@ private fun AdminBookingCard(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    booking.route?.let { route ->
+                        Text(
+                            text = "${route.source} to ${route.destination}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
                 StatusChip(status = booking.status)
             }
@@ -525,7 +580,9 @@ private fun createBookingsPdf(
         drawWrapped("${it.route.source} to ${it.route.destination}", sectionPaint)
         drawWrapped("Departure: ${formatDateTimeFull(it.departureTime)}", bodyPaint)
         finalArrival?.let { arr -> drawWrapped("Arrival: ${formatDateTimeFull(arr)}", bodyPaint) }
-        drawWrapped("${it.availableSeats} available / ${it.totalSeats} total", bodyPaint)
+        val availability = it.seatAvailabilityFromBookings(bookings)
+        drawWrapped("${availability.availableSeats} available / ${availability.bookableSeats} seats", bodyPaint)
+        drawWrapped("${availability.reservedSeats} requested / ${availability.totalSeats} total", bodyPaint)
         drawWrapped("Fare: Rs ${it.price.toLong()} per seat", bodyPaint, extraBottom = 8f)
     }
 

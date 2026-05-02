@@ -83,7 +83,8 @@ interface ApiService {
     @GET("admin/bookings")
     suspend fun getAdminBookings(
         @Query("busId") busId: String? = null,
-        @Query("status") status: String? = null
+        @Query("status") status: String? = null,
+        @Query("limit") limit: Int? = null
     ): Response<ApiResponse<List<BookingData>>>
 
     @PUT("admin/bookings/{id}/status")

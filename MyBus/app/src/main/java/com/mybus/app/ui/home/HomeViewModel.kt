@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.mybus.app.data.local.TokenManager
 import com.mybus.app.data.remote.dto.BusListItem
 import com.mybus.app.data.repository.BusRepository
+import com.mybus.app.ui.util.seatAvailabilityWithPair
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -65,9 +66,10 @@ class HomeViewModel @Inject constructor(
                     buses
                 }
 
-                val busMap = filtered.associateBy { it.id }
+                val withPairedAvailability = filtered.withPairedRoundTripAvailability()
+                val busMap = withPairedAvailability.associateBy { it.id }
                 val removedIds = mutableSetOf<String>()
-                for (bus in filtered) {
+                for (bus in withPairedAvailability) {
                     if (bus.tripType == "round_trip" && bus.returnBusId != null
                         && bus.id !in removedIds
                     ) {
@@ -83,7 +85,7 @@ class HomeViewModel @Inject constructor(
                         }
                     }
                 }
-                val deduplicated = filtered.filter { it.id !in removedIds }
+                val deduplicated = withPairedAvailability.filter { it.id !in removedIds }
 
                 _uiState.value = _uiState.value.copy(isLoading = false, buses = deduplicated)
             }.onFailure { error ->
@@ -97,5 +99,18 @@ class HomeViewModel @Inject constructor(
 
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
+    }
+
+    private fun List<BusListItem>.withPairedRoundTripAvailability(): List<BusListItem> {
+        val busMap = associateBy { it.id }
+        return map { bus ->
+            val pair = bus.returnBusId?.let { busMap[it] }
+            val availability = bus.seatAvailabilityWithPair(pair)
+            bus.copy(
+                bookedSeats = availability.reservedSeats,
+                availableSeats = availability.availableSeats,
+                bookableSeats = availability.bookableSeats
+            )
+        }
     }
 }

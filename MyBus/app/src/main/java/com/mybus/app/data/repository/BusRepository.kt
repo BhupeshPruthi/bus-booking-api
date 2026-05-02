@@ -132,7 +132,7 @@ class BusRepository @Inject constructor(
 
     suspend fun getAdminBookingsForBus(busId: String): Result<List<BookingData>> {
         return try {
-            val response = apiService.getAdminBookings(busId = busId)
+            val response = apiService.getAdminBookings(busId = busId, limit = 100)
             if (response.isSuccessful && response.body()?.success == true) {
                 Result.success(response.body()!!.data!!)
             } else {

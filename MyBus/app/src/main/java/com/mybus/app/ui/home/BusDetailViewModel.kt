@@ -8,6 +8,7 @@ import com.mybus.app.data.remote.dto.BookingData
 import com.mybus.app.data.remote.dto.BusDetailData
 import com.mybus.app.data.remote.dto.PickupPointInfo
 import com.mybus.app.data.repository.BusRepository
+import com.mybus.app.ui.util.seatAvailability
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -98,7 +99,7 @@ class BusDetailViewModel @Inject constructor(
     }
 
     fun updateSeatCount(count: Int) {
-        val max = _uiState.value.bus?.availableSeats ?: 1
+        val max = _uiState.value.bus?.seatAvailability()?.availableSeats ?: 1
         _uiState.value = _uiState.value.copy(seatCount = count.coerceIn(1, max))
     }
 
@@ -131,8 +132,15 @@ class BusDetailViewModel @Inject constructor(
                     if (existingName.isBlank() && state.passengerName.isNotBlank()) {
                         tokenManager.updateUserName(state.passengerName.trim())
                     }
+                    val availability = bus.seatAvailability()
+                    val updatedBus = bus.copy(
+                        bookedSeats = availability.reservedSeats + booking.seatCount,
+                        availableSeats = (availability.availableSeats - booking.seatCount).coerceAtLeast(0)
+                    )
                     _uiState.value = _uiState.value.copy(
                         isBooking = false,
+                        bus = updatedBus,
+                        seatCount = 1,
                         bookingResult = booking,
                         showBookingDialog = false
                     )

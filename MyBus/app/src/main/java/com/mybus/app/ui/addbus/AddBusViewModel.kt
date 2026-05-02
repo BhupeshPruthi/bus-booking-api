@@ -33,7 +33,7 @@ data class AddBusUiState(
     val arrivalDate: LocalDate? = null,
     val arrivalTime: LocalTime? = null,
     val totalSeats: String = "",
-    /** Seats numbered 1..[reserved] are not for sale; booking starts at seat [reserved]+1. Bookable count = total − reserved. */
+    /** Seats numbered 1..[reserved] are not for sale; booking starts at seat [reserved]+1. */
     val reservedSeatsFromStart: String = "0",
     val price: String = "",
     val contactName: String = "",
@@ -114,7 +114,7 @@ class AddBusViewModel @Inject constructor(
             issues.add("Reserved seats cannot be negative")
         }
         if (totalSeatsInt != null && reserved >= totalSeatsInt) {
-            issues.add("Reserved seats must be less than total seats (so there is at least one bookable seat)")
+            issues.add("Reserved seats must be less than total seats (so there is at least one seat available for booking)")
         }
         if (state.price.isBlank()) issues.add("Price is empty")
         else {
