@@ -1,13 +1,6 @@
 const { db } = require('../config/database');
 const { NotFoundError, ValidationError } = require('../utils/errors');
-
-const ACTIVE_SEAT_STATUSES = ['pending', 'payment_uploaded', 'confirmed', 'cancellation_requested'];
-
-/** Max passengers that can be booked for this bus (seats seat_start..total_seats). */
-function bookableSeatCapacity(bus) {
-  const start = bus.seat_start_number || 1;
-  return Math.max(0, bus.total_seats - start + 1);
-}
+const seatAvailability = require('./seatAvailabilityService');
 
 class BusService {
   /**
@@ -74,9 +67,7 @@ class BusService {
 
     const buses = await query;
 
-    // Get booked seats count for each bus
-    const busIds = buses.map((b) => b.id);
-    const bookedSeats = await this.getBookedSeatsCount(busIds);
+    const reservedSeatsByBus = await seatAvailability.getReservedSeatsByBus(db, buses);
 
     const formatted = buses.map((bus) => ({
       ...this.formatBus(bus),
@@ -85,11 +76,7 @@ class BusService {
         source: bus.source,
         destination: bus.destination,
       },
-      bookedSeats: bookedSeats[bus.id] || 0,
-      availableSeats: Math.max(
-        0,
-        bookableSeatCapacity(bus) - (bookedSeats[bus.id] || 0)
-      ),
+      ...seatAvailability.buildAvailability(bus, reservedSeatsByBus[bus.id]),
     }));
 
     return this.enrichWithReturnTimes(formatted);
@@ -141,9 +128,7 @@ class BusService {
 
     const buses = await query;
 
-    // Get booked seats count for each bus
-    const busIds = buses.map((b) => b.id);
-    const bookedSeats = await this.getBookedSeatsCount(busIds);
+    const reservedSeatsByBus = await seatAvailability.getReservedSeatsByBus(db, buses);
 
     const formatted = buses.map((bus) => ({
       ...this.formatBus(bus),
@@ -152,11 +137,7 @@ class BusService {
         source: bus.source,
         destination: bus.destination,
       },
-      bookedSeats: bookedSeats[bus.id] || 0,
-      availableSeats: Math.max(
-        0,
-        bookableSeatCapacity(bus) - (bookedSeats[bus.id] || 0)
-      ),
+      ...seatAvailability.buildAvailability(bus, reservedSeatsByBus[bus.id]),
     }));
 
     return this.enrichWithReturnTimes(formatted);
@@ -186,8 +167,7 @@ class BusService {
       .where('bus_id', busId)
       .orderBy('sequence', 'asc');
 
-    // Get booked seats count
-    const bookedSeats = await this.getBookedSeatsCount([busId]);
+    const reservedSeatsByBus = await seatAvailability.getReservedSeatsByBus(db, [bus]);
     let returnTimes = {};
     if (bus.trip_type === 'round_trip' && bus.return_bus_id) {
       const returnBus = await db('buses')
@@ -218,11 +198,7 @@ class BusService {
         address: pp.address,
         sequence: pp.sequence,
       })),
-      bookedSeats: bookedSeats[busId] || 0,
-      availableSeats: Math.max(
-        0,
-        bookableSeatCapacity(bus) - (bookedSeats[busId] || 0)
-      ),
+      ...seatAvailability.buildAvailability(bus, reservedSeatsByBus[busId]),
     };
   }
 
@@ -264,10 +240,10 @@ class BusService {
       throw new NotFoundError('Bus');
     }
 
-    // Cancel all active bookings for this bus
+    // Cancel every booking that still reserves seats for this bus.
     await db('bookings')
       .where('bus_id', busId)
-      .whereIn('status', ACTIVE_SEAT_STATUSES)
+      .whereNotIn('status', seatAvailability.RELEASED_SEAT_STATUSES)
       .update({ status: 'cancelled', updated_at: new Date() });
 
     return { message: 'Bus trip cancelled successfully' };
@@ -275,20 +251,18 @@ class BusService {
 
   /**
    * Get booked seats count for buses
-   * Only count non-cancelled, non-expired, non-rejected bookings
+   * Any requested seat remains reserved until the request is cancelled.
    */
   async getBookedSeatsCount(busIds) {
-    if (busIds.length === 0) return {};
+    if (!busIds.length) return {};
 
-    const result = await db('bookings')
-      .select('bus_id')
-      .sum('seat_count as total')
-      .whereIn('bus_id', busIds)
-      .whereIn('status', ACTIVE_SEAT_STATUSES)
-      .groupBy('bus_id');
+    const buses = await db('buses')
+      .select('id', 'trip_type', 'return_bus_id')
+      .whereIn('id', busIds);
 
-    return result.reduce((acc, row) => {
-      acc[row.bus_id] = parseInt(row.total, 10);
+    const counts = await seatAvailability.getReservedSeatsByBus(db, buses);
+    return busIds.reduce((acc, busId) => {
+      acc[busId] = counts[busId] || 0;
       return acc;
     }, {});
   }

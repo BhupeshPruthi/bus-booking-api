@@ -1,54 +1,11 @@
 const { db } = require('../config/database');
 const { NotFoundError, ValidationError, ConflictError, ForbiddenError } = require('../utils/errors');
+const seatAvailability = require('./seatAvailabilityService');
 
-const ACTIVE_SEAT_STATUSES = ['pending', 'payment_uploaded', 'confirmed', 'cancellation_requested'];
 const TERMINAL_BOOKING_STATUSES = ['rejected', 'expired', 'cancelled'];
 const USER_IMMEDIATE_CANCELLATION_STATUSES = ['pending', 'payment_uploaded'];
 const USER_CANCELLATION_CUTOFF_HOURS = 48;
 const HOUR_MS = 60 * 60 * 1000;
-
-function parseAssignedSeats(value) {
-  if (!value) return [];
-  return String(value)
-    .split(',')
-    .map((seat) => parseInt(seat.trim(), 10))
-    .filter((seat) => Number.isInteger(seat));
-}
-
-function reserveFirstAvailableSeats(occupiedSeats, count, seatStart, totalSeats) {
-  const seats = [];
-  for (let seat = seatStart; seat <= totalSeats && seats.length < count; seat += 1) {
-    if (!occupiedSeats.has(seat)) {
-      occupiedSeats.add(seat);
-      seats.push(seat);
-    }
-  }
-  return seats;
-}
-
-function collectOccupiedSeats(bookings, seatStart, totalSeats) {
-  const occupiedSeats = new Set();
-
-  bookings.forEach((booking) => {
-    const assignedSeats = parseAssignedSeats(booking.assigned_seats)
-      .filter((seat) => seat >= seatStart && seat <= totalSeats);
-
-    if (assignedSeats.length > 0) {
-      assignedSeats.forEach((seat) => occupiedSeats.add(seat));
-      return;
-    }
-
-    // Compatibility for older rows that may not have assigned_seats populated.
-    reserveFirstAvailableSeats(
-      occupiedSeats,
-      parseInt(booking.seat_count || 0, 10),
-      seatStart,
-      totalSeats
-    );
-  });
-
-  return occupiedSeats;
-}
 
 class BookingService {
   /**
@@ -82,19 +39,27 @@ class BookingService {
       }
 
       const seatStart = bus.seat_start_number || 1;
+      const reservationBusIds = seatAvailability.getReservationBusIds(bus);
       const activeBookings = await trx('bookings')
-        .where('bus_id', data.busId)
-        .whereIn('status', ACTIVE_SEAT_STATUSES)
+        .whereIn('bus_id', reservationBusIds)
+        .whereNotIn('status', seatAvailability.RELEASED_SEAT_STATUSES)
         .orderBy('created_at', 'asc')
         .select('assigned_seats', 'seat_count');
 
-      const occupiedSeats = collectOccupiedSeats(activeBookings, seatStart, bus.total_seats);
-      const availableSeats = Math.max(0, bus.total_seats - seatStart + 1 - occupiedSeats.size);
+      const occupiedSeats = seatAvailability.collectOccupiedSeats(
+        activeBookings,
+        seatStart,
+        bus.total_seats
+      );
+      const availableSeats = Math.max(
+        0,
+        seatAvailability.bookableSeatCapacity(bus) - occupiedSeats.size
+      );
       if (data.seatCount > availableSeats) {
         throw new ConflictError(`Only ${availableSeats} seats available. Requested: ${data.seatCount}`);
       }
 
-      const seatNumbers = reserveFirstAvailableSeats(
+      const seatNumbers = seatAvailability.reserveBestAvailableSeats(
         occupiedSeats,
         data.seatCount,
         seatStart,

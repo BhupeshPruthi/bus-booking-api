@@ -11,6 +11,7 @@
     "migrate:rollback": "knex migrate:rollback",
     "migrate:make": "knex migrate:make",
     "seed": "knex seed:run",
+    "test": "node --test",
     "db:dump-data": "node scripts/dump-db-data.js",
     "api:list": "node scripts/list-api-routes.js",
     "start:prod": "NODE_ENV=production node src/app.js"
