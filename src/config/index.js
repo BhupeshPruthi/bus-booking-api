@@ -20,6 +20,14 @@ const googleClientIds = (process.env.GOOGLE_CLIENT_IDS || process.env.GOOGLE_CLI
   .map((id) => id.trim())
   .filter(Boolean);
 
+function firstEnv(...keys) {
+  for (const key of keys) {
+    const value = process.env[key]?.trim();
+    if (value) return value;
+  }
+  return '';
+}
+
 const config = {
   env: process.env.NODE_ENV || 'development',
   port: parseInt(process.env.PORT, 10) || 8080,
@@ -74,13 +82,13 @@ const config = {
   },
 
   s3: {
-    endpoint: process.env.S3_ENDPOINT || '',
-    region: process.env.S3_REGION || 'auto',
-    bucket: process.env.S3_BUCKET || '',
-    accessKeyId: process.env.S3_ACCESS_KEY_ID || '',
-    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || '',
-    publicBaseUrl: process.env.S3_PUBLIC_BASE_URL || '',
-    forcePathStyle: process.env.S3_FORCE_PATH_STYLE !== 'false',
+    endpoint: firstEnv('S3_ENDPOINT', 'AWS_ENDPOINT_URL'),
+    region: firstEnv('S3_REGION', 'AWS_DEFAULT_REGION') || 'auto',
+    bucket: firstEnv('S3_BUCKET', 'AWS_S3_BUCKET_NAME'),
+    accessKeyId: firstEnv('S3_ACCESS_KEY_ID', 'AWS_ACCESS_KEY_ID'),
+    secretAccessKey: firstEnv('S3_SECRET_ACCESS_KEY', 'AWS_SECRET_ACCESS_KEY'),
+    publicBaseUrl: firstEnv('S3_PUBLIC_BASE_URL', 'AWS_S3_PUBLIC_URL'),
+    forcePathStyle: firstEnv('S3_FORCE_PATH_STYLE', 'AWS_S3_URL_STYLE') !== 'virtual',
   },
 };
 
