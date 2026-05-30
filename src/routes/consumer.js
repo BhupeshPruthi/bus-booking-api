@@ -86,7 +86,7 @@ router.post(
 
 /**
  * @route POST /api/poojas/:id/bookings
- * @desc Book 1 token for a pooja
+ * @desc Book a pooja token for one or more members
  * @access Consumer
  */
 router.post(

@@ -177,7 +177,11 @@ const bookPoojaTokenSchema = Joi.object({
   phone: Joi.string()
     .pattern(/^[0-9]{10,15}$/)
     .required(),
+  memberCount: Joi.number().integer().min(1).max(10).default(1),
+  city: Joi.string().max(100).allow('', null).trim().default('Delhi - NCR'),
 });
+
+const adminCancelPoojaBookingSchema = Joi.object({});
 
 // ============ EVENTS SCHEMAS ============
 
@@ -235,6 +239,7 @@ module.exports = {
   // Pooja
   createPoojaSchema,
   bookPoojaTokenSchema,
+  adminCancelPoojaBookingSchema,
 
   // Events
   createEventSchema,

@@ -9,6 +9,7 @@ const {
   createTripSchema,
   createPoojaSchema,
   createEventSchema,
+  adminCancelPoojaBookingSchema,
 } = require('../validators/schemas');
 
 const router = express.Router();
@@ -56,6 +57,17 @@ router.get('/poojas', adminController.getAdminPoojas);
  * @access Admin
  */
 router.get('/poojas/:id', adminController.getAdminPoojaById);
+
+/**
+ * @route POST /api/admin/poojas/:poojaId/bookings/:bookingId/cancel
+ * @desc Cancel a confirmed pooja token booking
+ * @access Admin
+ */
+router.post(
+  '/poojas/:poojaId/bookings/:bookingId/cancel',
+  validate(adminCancelPoojaBookingSchema),
+  adminController.cancelPoojaBooking
+);
 
 /**
  * @route GET /api/admin/buses

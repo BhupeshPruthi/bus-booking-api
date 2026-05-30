@@ -60,6 +60,15 @@ const getAdminPoojaById = asyncHandler(async (req, res) => {
   res.json({ success: true, data: result });
 });
 
+const cancelPoojaBooking = asyncHandler(async (req, res) => {
+  const result = await poojaService.cancelBookingAsAdmin(
+    req.params.poojaId,
+    req.params.bookingId,
+    req.user.id
+  );
+  res.json({ success: true, data: result });
+});
+
 const createEvent = asyncHandler(async (req, res) => {
   const result = await eventService.createEvent(req.user.id, req.body);
   res.status(201).json({ success: true, data: result });
@@ -75,5 +84,6 @@ module.exports = {
   createPooja,
   getAdminPoojas,
   getAdminPoojaById,
+  cancelPoojaBooking,
   createEvent,
 };
