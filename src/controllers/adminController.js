@@ -4,6 +4,7 @@ const tripService = require('../services/tripService');
 const poojaService = require('../services/poojaService');
 const eventService = require('../services/eventService');
 const asyncHandler = require('../utils/asyncHandler');
+const { getApiBaseUrl } = require('../utils/requestBaseUrl');
 
 const getAllBuses = asyncHandler(async (req, res) => {
   const result = await busService.getAllBuses(req.query);
@@ -70,7 +71,9 @@ const cancelPoojaBooking = asyncHandler(async (req, res) => {
 });
 
 const createEvent = asyncHandler(async (req, res) => {
-  const result = await eventService.createEvent(req.user.id, req.body, req.file || null);
+  const result = await eventService.createEvent(req.user.id, req.body, req.file || null, {
+    imageBaseUrl: getApiBaseUrl(req),
+  });
   res.status(201).json({ success: true, data: result });
 });
 

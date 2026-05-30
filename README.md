@@ -68,9 +68,10 @@ For event photo uploads, add a Railway S3-compatible bucket and set these API se
 | `S3_BUCKET` | Bucket name |
 | `S3_ACCESS_KEY_ID` | Bucket access key |
 | `S3_SECRET_ACCESS_KEY` | Bucket secret key |
-| `S3_PUBLIC_BASE_URL` | Public URL prefix used by the Android app |
+| `S3_PUBLIC_BASE_URL` | Bucket URL prefix used when saving image paths |
 
 No-photo event creation works without these variables, but image uploads require all of them.
+Event list responses return API-hosted image URLs so the bucket can remain private.
 Set `S3_FORCE_PATH_STYLE=virtual` only if your bucket provider requires virtual-hosted-style URLs.
 
 ## Production on a VPS (outline)

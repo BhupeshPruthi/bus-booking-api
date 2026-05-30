@@ -2,7 +2,9 @@ const busService = require('../services/busService');
 const bookingService = require('../services/bookingService');
 const poojaService = require('../services/poojaService');
 const eventService = require('../services/eventService');
+const eventImageStorageService = require('../services/eventImageStorageService');
 const asyncHandler = require('../utils/asyncHandler');
+const { getApiBaseUrl } = require('../utils/requestBaseUrl');
 
 const searchBuses = asyncHandler(async (req, res) => {
   const result = await busService.searchBuses(req.query);
@@ -30,9 +32,33 @@ const bookPoojaToken = asyncHandler(async (req, res) => {
 });
 
 const getUpcomingEvents = asyncHandler(async (req, res) => {
-  const result = await eventService.getUpcomingEvents();
+  const result = await eventService.getUpcomingEvents({ imageBaseUrl: getApiBaseUrl(req) });
   res.json({ success: true, data: result });
 });
+
+const getEventImage = async (req, res, next) => {
+  try {
+    const image = await eventImageStorageService.getEventImage(req.params.imageName);
+    res.set({
+      'Content-Type': image.contentType,
+      'Cache-Control': image.cacheControl,
+    });
+
+    if (image.body && typeof image.body.pipe === 'function') {
+      image.body.on('error', next);
+      image.body.pipe(res);
+      return;
+    }
+
+    const chunks = [];
+    for await (const chunk of image.body) {
+      chunks.push(Buffer.from(chunk));
+    }
+    res.send(Buffer.concat(chunks));
+  } catch (error) {
+    next(error);
+  }
+};
 
 const createBooking = asyncHandler(async (req, res) => {
   const result = await bookingService.createBooking(req.user.id, req.body);
@@ -65,6 +91,7 @@ module.exports = {
   getPoojaDetails,
   bookPoojaToken,
   getUpcomingEvents,
+  getEventImage,
   createBooking,
   getMyBookings,
   getBookingById,

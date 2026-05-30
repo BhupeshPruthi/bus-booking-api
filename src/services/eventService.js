@@ -3,7 +3,7 @@ const { NotFoundError } = require('../utils/errors');
 const eventImageStorageService = require('./eventImageStorageService');
 
 class EventService {
-  async createEvent(adminUserId, data, imageFile = null) {
+  async createEvent(adminUserId, data, imageFile = null, options = {}) {
     let uploadedImage = null;
 
     try {
@@ -24,7 +24,7 @@ class EventService {
         .insert(eventData)
         .returning('*');
 
-      return this.getEventById(event.id);
+      return this.getEventById(event.id, options);
     } catch (error) {
       if (uploadedImage?.key) {
         await eventImageStorageService.deleteEventImage(uploadedImage.key).catch(() => {});
@@ -33,30 +33,33 @@ class EventService {
     }
   }
 
-  async getUpcomingEvents() {
+  async getUpcomingEvents(options = {}) {
     const now = new Date();
     const events = await db('events')
       .where('status', 'scheduled')
       .andWhere('event_at', '>', now)
       .orderBy('event_at', 'asc');
 
-    return events.map((e) => this.formatEvent(e));
+    return events.map((e) => this.formatEvent(e, options));
   }
 
-  async getEventById(eventId) {
+  async getEventById(eventId, options = {}) {
     const event = await db('events').where('id', eventId).first();
     if (!event) throw new NotFoundError('Event');
-    return this.formatEvent(event);
+    return this.formatEvent(event, options);
   }
 
-  formatEvent(event) {
+  formatEvent(event, options = {}) {
+    const storedImageUrl = event.image_url || null;
     return {
       id: event.id,
       header: event.header,
       subHeader: event.sub_header,
       eventDate: event.event_at,
       status: event.status,
-      imageUrl: event.image_url || null,
+      imageUrl: options.imageBaseUrl
+        ? eventImageStorageService.getEventImageProxyUrl(storedImageUrl, options.imageBaseUrl)
+        : storedImageUrl,
       createdAt: event.created_at,
     };
   }

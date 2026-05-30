@@ -1,8 +1,13 @@
 const path = require('path');
-const { DeleteObjectCommand, PutObjectCommand, S3Client } = require('@aws-sdk/client-s3');
+const {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} = require('@aws-sdk/client-s3');
 const { v4: uuidv4 } = require('uuid');
 const config = require('../config');
-const { InternalError } = require('../utils/errors');
+const { InternalError, NotFoundError, ValidationError } = require('../utils/errors');
 
 const extensionByMime = {
   'image/jpeg': '.jpg',
@@ -10,6 +15,14 @@ const extensionByMime = {
   'image/png': '.png',
   'image/gif': '.gif',
   'image/webp': '.webp',
+};
+
+const contentTypeByExtension = {
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
 };
 
 let client = null;
@@ -59,6 +72,46 @@ function publicUrlForKey(key) {
   return `${config.s3.publicBaseUrl.replace(/\/+$/, '')}/${key}`;
 }
 
+function getEventImageNameFromUrl(imageUrl) {
+  if (!imageUrl) return null;
+  try {
+    const { pathname } = new URL(imageUrl);
+    const segments = pathname.split('/').filter(Boolean).map(decodeURIComponent);
+    const eventsIndex = segments.lastIndexOf('events');
+    if (eventsIndex < 0 || !segments[eventsIndex + 1]) return null;
+    return path.basename(segments[eventsIndex + 1]);
+  } catch (error) {
+    return null;
+  }
+}
+
+function getEventImageProxyUrl(imageUrl, apiBaseUrl) {
+  const imageName = getEventImageNameFromUrl(imageUrl);
+  if (!imageName || !apiBaseUrl) return imageUrl || null;
+  return `${apiBaseUrl.replace(/\/+$/, '')}/events/images/${encodeURIComponent(imageName)}`;
+}
+
+function getEventImageKey(imageName) {
+  let decoded;
+  try {
+    decoded = decodeURIComponent(imageName || '');
+  } catch (error) {
+    throw new ValidationError('Invalid event image name');
+  }
+
+  const normalized = path.basename(decoded);
+  const extension = path.extname(normalized).toLowerCase();
+  if (
+    !normalized ||
+    normalized !== decoded ||
+    !/^[a-zA-Z0-9._-]+$/.test(normalized) ||
+    !contentTypeByExtension[extension]
+  ) {
+    throw new ValidationError('Invalid event image name');
+  }
+  return `events/${normalized}`;
+}
+
 async function uploadEventImage(file) {
   if (!file) return null;
 
@@ -86,7 +139,33 @@ async function deleteEventImage(key) {
   }));
 }
 
+async function getEventImage(imageName) {
+  const key = getEventImageKey(imageName);
+  try {
+    const result = await getClient().send(new GetObjectCommand({
+      Bucket: config.s3.bucket,
+      Key: key,
+    }));
+
+    return {
+      body: result.Body,
+      contentType: result.ContentType
+        || contentTypeByExtension[path.extname(key).toLowerCase()]
+        || 'application/octet-stream',
+      cacheControl: result.CacheControl || 'public, max-age=31536000, immutable',
+    };
+  } catch (error) {
+    if (error?.name === 'NoSuchKey' || error?.$metadata?.httpStatusCode === 404) {
+      throw new NotFoundError('Event image');
+    }
+    throw error;
+  }
+}
+
 module.exports = {
   uploadEventImage,
   deleteEventImage,
+  getEventImage,
+  getEventImageNameFromUrl,
+  getEventImageProxyUrl,
 };

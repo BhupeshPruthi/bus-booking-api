@@ -89,6 +89,7 @@ function loadEventServiceWithFixture(fixture, storageMock = {}) {
     exports: {
       uploadEventImage: storageMock.uploadEventImage || (async () => null),
       deleteEventImage: storageMock.deleteEventImage || (async () => {}),
+      getEventImageProxyUrl: storageMock.getEventImageProxyUrl || ((url) => url),
     },
   };
 
@@ -133,4 +134,26 @@ test('createEvent stores uploaded event image URL', async () => {
   assert.equal(uploads.length, 1);
   assert.equal(event.imageUrl, 'https://cdn.example.com/events/test.jpg');
   assert.equal(fixture.events[0].image_url, 'https://cdn.example.com/events/test.jpg');
+});
+
+test('createEvent can return proxied event image URL for private bucket images', async () => {
+  const fixture = { events: [] };
+  const eventService = loadEventServiceWithFixture(fixture, {
+    uploadEventImage: async () => ({ key: 'events/test.jpg', url: 'https://cdn.example.com/events/test.jpg' }),
+    getEventImageProxyUrl: (url, apiBaseUrl) => `${apiBaseUrl}/events/images/${url.split('/').pop()}`,
+  });
+
+  const event = await eventService.createEvent(
+    'admin-1',
+    {
+      header: 'Satsang',
+      subHeader: 'Community event',
+      eventDate: '2099-02-01T18:00:00.000Z',
+    },
+    { buffer: Buffer.from('image'), mimetype: 'image/jpeg', originalname: 'event.jpg' },
+    { imageBaseUrl: 'https://api.example.com/api' }
+  );
+
+  assert.equal(fixture.events[0].image_url, 'https://cdn.example.com/events/test.jpg');
+  assert.equal(event.imageUrl, 'https://api.example.com/api/events/images/test.jpg');
 });

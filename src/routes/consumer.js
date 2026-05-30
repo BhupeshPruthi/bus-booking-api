@@ -47,6 +47,13 @@ router.get('/poojas/:id', consumerController.getPoojaDetails);
 router.get('/events', consumerController.getUpcomingEvents);
 
 /**
+ * @route GET /api/events/images/:imageName
+ * @desc Stream event image from private bucket
+ * @access Public
+ */
+router.get('/events/images/:imageName', consumerController.getEventImage);
+
+/**
  * @route POST /api/bookings
  * @desc Create a new booking
  * @access Consumer
