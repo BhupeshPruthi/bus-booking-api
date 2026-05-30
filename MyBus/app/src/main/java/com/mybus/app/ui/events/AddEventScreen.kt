@@ -1,34 +1,58 @@
 package com.mybus.app.ui.events
 
 import android.app.DatePickerDialog
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusState
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil.compose.AsyncImage
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun AddEventScreen(
     onBack: () -> Unit,
     viewModel: AddEventViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
+    val imagePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+        onResult = { uri -> uri?.let { viewModel.updateImage(it) } }
+    )
 
     if (state.error != null) {
         AlertDialog(
@@ -49,6 +73,7 @@ fun AddEventScreen(
                     Text("Header: ${created.header}")
                     Text("Sub Header: ${created.subHeader}")
                     Text("Date: ${formatEventDate(created.eventDate)}")
+                    Text("Photo: ${if (created.imageUrl.isNullOrBlank()) "Default banner" else "Uploaded"}")
                 }
             },
             confirmButton = {
@@ -73,8 +98,10 @@ fun AddEventScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .imePadding()
+                .navigationBarsPadding()
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             if (state.isLoading) {
@@ -93,7 +120,9 @@ fun AddEventScreen(
                 label = { Text("Header") },
                 singleLine = true,
                 enabled = !state.isLoading,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .bringIntoViewOnFocus()
             )
 
             OutlinedTextField(
@@ -101,7 +130,9 @@ fun AddEventScreen(
                 onValueChange = { viewModel.updateSubHeader(it) },
                 label = { Text("Sub Header") },
                 enabled = !state.isLoading,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .bringIntoViewOnFocus(),
                 minLines = 2
             )
 
@@ -111,12 +142,24 @@ fun AddEventScreen(
                 onDateSelected = { viewModel.updateDate(it) }
             )
 
+            EventPhotoPicker(
+                selectedImageUri = state.imageUri,
+                enabled = !state.isLoading,
+                onPickImage = {
+                    imagePicker.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                    )
+                },
+                onRemoveImage = { viewModel.updateImage(null) }
+            )
+
             Button(
                 onClick = { viewModel.createEvent() },
                 enabled = !state.isLoading,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp)
+                    .bringIntoViewOnFocus()
             ) {
                 if (state.isLoading) {
                     CircularProgressIndicator(
@@ -128,6 +171,110 @@ fun AddEventScreen(
                     Icon(Icons.Filled.Event, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text("Add Event", textAlign = TextAlign.Center)
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun Modifier.bringIntoViewOnFocus(
+    onFocusChanged: (FocusState) -> Unit = {}
+): Modifier {
+    val requester = remember { BringIntoViewRequester() }
+    val scope = rememberCoroutineScope()
+    return bringIntoViewRequester(requester)
+        .onFocusChanged { focusState ->
+            onFocusChanged(focusState)
+            if (focusState.isFocused) {
+                scope.launch {
+                    delay(250)
+                    requester.bringIntoView()
+                }
+            }
+        }
+}
+
+@Composable
+private fun EventPhotoPicker(
+    selectedImageUri: Uri?,
+    enabled: Boolean,
+    onPickImage: () -> Unit,
+    onRemoveImage: () -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            text = "Event Photo",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold
+        )
+
+        if (selectedImageUri != null) {
+            AsyncImage(
+                model = selectedImageUri,
+                contentDescription = "Selected event photo",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1600f / 1066f)
+                    .clip(RoundedCornerShape(12.dp))
+            )
+        } else {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1600f / 1066f),
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                tonalElevation = 1.dp
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.PhotoLibrary,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = "Default banner will be used",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            OutlinedButton(
+                onClick = onPickImage,
+                enabled = enabled,
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(Icons.Filled.PhotoLibrary, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(if (selectedImageUri == null) "Select Photo" else "Change Photo")
+            }
+            if (selectedImageUri != null) {
+                OutlinedButton(
+                    onClick = onRemoveImage,
+                    enabled = enabled,
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    ),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Filled.Close, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Remove")
                 }
             }
         }
@@ -170,4 +317,3 @@ private fun formatEventDate(isoString: String): String {
         isoString
     }
 }
-

@@ -70,7 +70,7 @@ const cancelPoojaBooking = asyncHandler(async (req, res) => {
 });
 
 const createEvent = asyncHandler(async (req, res) => {
-  const result = await eventService.createEvent(req.user.id, req.body);
+  const result = await eventService.createEvent(req.user.id, req.body, req.file || null);
   res.status(201).json({ success: true, data: result });
 });
 

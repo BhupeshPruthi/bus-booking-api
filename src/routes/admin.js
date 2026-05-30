@@ -2,6 +2,7 @@ const express = require('express');
 const adminController = require('../controllers/adminController');
 const { authenticate } = require('../middlewares/authenticate');
 const { adminOrSuperUser } = require('../middlewares/authorize');
+const { eventImageUpload, handleMulterError } = require('../middlewares/upload');
 const validate = require('../middlewares/validate');
 const {
   bookingQuerySchema,
@@ -24,6 +25,8 @@ router.use(authenticate);
 router.post(
   '/events',
   adminOrSuperUser,
+  eventImageUpload.single('image'),
+  handleMulterError,
   validate(createEventSchema),
   adminController.createEvent
 );

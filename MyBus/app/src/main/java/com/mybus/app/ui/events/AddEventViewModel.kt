@@ -1,5 +1,6 @@
 package com.mybus.app.ui.events
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mybus.app.data.remote.dto.EventListItem
@@ -17,6 +18,7 @@ data class AddEventUiState(
     val header: String = "",
     val subHeader: String = "",
     val date: LocalDate? = null,
+    val imageUri: Uri? = null,
     val isLoading: Boolean = false,
     val error: String? = null,
     val created: EventListItem? = null
@@ -40,6 +42,10 @@ class AddEventViewModel @Inject constructor(
 
     fun updateDate(value: LocalDate) {
         _uiState.value = _uiState.value.copy(date = value, error = null)
+    }
+
+    fun updateImage(value: Uri?) {
+        _uiState.value = _uiState.value.copy(imageUri = value, error = null)
     }
 
     fun clearError() {
@@ -78,7 +84,12 @@ class AddEventViewModel @Inject constructor(
 
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
-            eventRepository.createEvent(header = header, subHeader = subHeader, eventDate = eventInstant)
+            eventRepository.createEvent(
+                header = header,
+                subHeader = subHeader,
+                eventDate = eventInstant,
+                imageUri = state.imageUri
+            )
                 .onSuccess { created ->
                     _uiState.value = _uiState.value.copy(isLoading = false, created = created)
                 }
@@ -91,4 +102,3 @@ class AddEventViewModel @Inject constructor(
         }
     }
 }
-

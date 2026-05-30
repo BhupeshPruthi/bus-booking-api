@@ -10,6 +10,7 @@ data class EventListItem(
     @Json(name = "subHeader") val subHeader: String,
     @Json(name = "eventDate") val eventDate: String,
     @Json(name = "status") val status: String? = null,
+    @Json(name = "imageUrl") val imageUrl: String? = null,
     @Json(name = "createdAt") val createdAt: String? = null
 )
 
@@ -19,4 +20,3 @@ data class CreateEventRequest(
     @Json(name = "subHeader") val subHeader: String,
     @Json(name = "eventDate") val eventDate: String
 )
-

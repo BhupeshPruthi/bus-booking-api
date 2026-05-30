@@ -1,19 +1,36 @@
 const { db } = require('../config/database');
-const { NotFoundError, ValidationError } = require('../utils/errors');
+const { NotFoundError } = require('../utils/errors');
+const eventImageStorageService = require('./eventImageStorageService');
 
 class EventService {
-  async createEvent(adminUserId, data) {
-    const [event] = await db('events')
-      .insert({
+  async createEvent(adminUserId, data, imageFile = null) {
+    let uploadedImage = null;
+
+    try {
+      uploadedImage = await eventImageStorageService.uploadEventImage(imageFile);
+
+      const eventData = {
         header: data.header,
         sub_header: data.subHeader,
         event_at: data.eventDate,
         status: 'scheduled',
         created_by: adminUserId,
-      })
-      .returning('*');
+      };
+      if (uploadedImage?.url) {
+        eventData.image_url = uploadedImage.url;
+      }
 
-    return this.getEventById(event.id);
+      const [event] = await db('events')
+        .insert(eventData)
+        .returning('*');
+
+      return this.getEventById(event.id);
+    } catch (error) {
+      if (uploadedImage?.key) {
+        await eventImageStorageService.deleteEventImage(uploadedImage.key).catch(() => {});
+      }
+      throw error;
+    }
   }
 
   async getUpcomingEvents() {
@@ -39,10 +56,10 @@ class EventService {
       subHeader: event.sub_header,
       eventDate: event.event_at,
       status: event.status,
+      imageUrl: event.image_url || null,
       createdAt: event.created_at,
     };
   }
 }
 
 module.exports = new EventService();
-

@@ -59,6 +59,19 @@ This repo includes [`railway.toml`](railway.toml) with **`preDeployCommand`** so
 
 If the **deployed** API still logs `ENOTFOUND` for `postgres.railway.internal`, the API service is not receiving a valid Railway-injected `DATABASE_URL` (check **Variables** → reference the Postgres service’s `DATABASE_URL`, redeploy).
 
+For event photo uploads, add a Railway S3-compatible bucket and set these API service variables:
+
+| Variable | Purpose |
+|----------|---------|
+| `S3_ENDPOINT` | Bucket endpoint URL |
+| `S3_REGION` | Bucket region, or `auto` if Railway provides that |
+| `S3_BUCKET` | Bucket name |
+| `S3_ACCESS_KEY_ID` | Bucket access key |
+| `S3_SECRET_ACCESS_KEY` | Bucket secret key |
+| `S3_PUBLIC_BASE_URL` | Public URL prefix used by the Android app |
+
+No-photo event creation works without these variables, but image uploads require all of them.
+
 ## Production on a VPS (outline)
 
 1. Install Node 20+, PostgreSQL, nginx (optional but recommended), Certbot for TLS.

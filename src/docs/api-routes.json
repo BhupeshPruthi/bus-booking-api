@@ -14,7 +14,7 @@
   },
   "nonApi": [
     { "method": "GET", "path": "/health", "auth": "none", "description": "Liveness" },
-    { "method": "GET", "path": "/uploads/*", "auth": "none", "description": "Static payment screenshots" }
+    { "method": "GET", "path": "/uploads/*", "auth": "none", "description": "Static uploaded files" }
   ],
   "routes": [
     { "method": "POST", "path": "/api/auth/google", "auth": "none", "group": "auth" },
@@ -30,7 +30,7 @@
     { "method": "GET", "path": "/api/bookings/:id", "auth": "bearer", "group": "consumer" },
     { "method": "POST", "path": "/api/bookings/:id/cancellation-request", "auth": "bearer", "group": "consumer" },
     { "method": "POST", "path": "/api/poojas/:id/bookings", "auth": "bearer", "group": "consumer" },
-    { "method": "POST", "path": "/api/admin/events", "auth": "bearer+adminOrSuperuser", "group": "admin" },
+    { "method": "POST", "path": "/api/admin/events", "auth": "bearer+adminOrSuperuser", "group": "admin", "body": "JSON or multipart/form-data with optional image" },
     { "method": "POST", "path": "/api/admin/trips", "auth": "bearer+adminOrSuperuser", "group": "admin" },
     { "method": "POST", "path": "/api/admin/poojas", "auth": "bearer+adminOrSuperuser", "group": "admin" },
     { "method": "GET", "path": "/api/admin/poojas", "auth": "bearer+adminOrSuperuser", "group": "admin" },

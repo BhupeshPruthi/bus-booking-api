@@ -1,7 +1,6 @@
 package com.mybus.app.ui.home
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -41,6 +40,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.compose.AsyncImage
 import com.mybus.app.data.remote.dto.BookingData
 import com.mybus.app.data.remote.dto.EventListItem
 import com.mybus.app.R
@@ -252,14 +252,17 @@ private fun UpcomingEventCard(
         shape = cardShape,
     ) {
         Column {
-            Image(
-                painter = painterResource(R.drawable.upcoming_event_banner),
+            AsyncImage(
+                model = event.imageUrl,
+                placeholder = painterResource(R.drawable.upcoming_event_banner),
+                error = painterResource(R.drawable.upcoming_event_banner),
+                fallback = painterResource(R.drawable.upcoming_event_banner),
                 contentDescription = event.header,
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(1600f / 1066f)
                     .clip(bannerTopShape),
-                contentScale = ContentScale.Fit,
+                contentScale = ContentScale.Crop,
             )
             Column(
                 Modifier.padding(12.dp),

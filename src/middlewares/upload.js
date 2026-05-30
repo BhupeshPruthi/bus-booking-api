@@ -16,6 +16,8 @@ const storage = multer.diskStorage({
   },
 });
 
+const memoryStorage = multer.memoryStorage();
+
 // File filter for images only
 const fileFilter = (req, file, cb) => {
   const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
@@ -36,6 +38,14 @@ const upload = multer({
   },
 });
 
+const eventImageUpload = multer({
+  storage: memoryStorage,
+  fileFilter,
+  limits: {
+    fileSize: config.upload.maxFileSize,
+  },
+});
+
 // Error handler for multer errors
 const handleMulterError = (err, req, res, next) => {
   if (err instanceof multer.MulterError) {
@@ -47,4 +57,4 @@ const handleMulterError = (err, req, res, next) => {
   next(err);
 };
 
-module.exports = { upload, handleMulterError };
+module.exports = { upload, eventImageUpload, handleMulterError };
