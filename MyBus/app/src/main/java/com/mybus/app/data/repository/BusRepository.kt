@@ -2,6 +2,7 @@ package com.mybus.app.data.repository
 
 import com.mybus.app.data.remote.ApiService
 import com.mybus.app.data.remote.dto.*
+import retrofit2.Response
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -11,6 +12,21 @@ class AuthenticationRequiredException : Exception("Authentication required")
 class BusRepository @Inject constructor(
     private val apiService: ApiService
 ) {
+
+    private fun <T> errorMessage(response: Response<ApiResponse<T>>, fallback: String): String {
+        val bodyMsg = response.body()?.error?.message
+        if (!bodyMsg.isNullOrBlank()) return bodyMsg
+
+        val raw = response.errorBody()?.string()
+        if (raw.isNullOrBlank()) return fallback
+
+        val extracted = Regex("\"message\"\\s*:\\s*\"([^\"]+)\"")
+            .find(raw)
+            ?.groupValues
+            ?.getOrNull(1)
+
+        return extracted ?: raw
+    }
 
     suspend fun getConsumerBuses(): Result<List<BusListItem>> {
         return try {
@@ -26,13 +42,27 @@ class BusRepository @Inject constructor(
         }
     }
 
-    suspend fun getAdminBuses(): Result<List<BusListItem>> {
+    suspend fun getAdminBuses(status: String? = null): Result<List<BusListItem>> {
         return try {
-            val response = apiService.getAdminBuses()
+            val response = apiService.getAdminBuses(status)
             if (response.isSuccessful && response.body()?.success == true) {
                 Result.success(response.body()!!.data!!)
             } else {
                 val msg = response.body()?.error?.message ?: "Failed to load buses"
+                Result.failure(Exception(msg))
+            }
+        } catch (e: Exception) {
+            Result.failure(Exception("Network error: ${e.message}"))
+        }
+    }
+
+    suspend fun deleteBus(busId: String): Result<DeleteBusResult> {
+        return try {
+            val response = apiService.deleteBus(busId)
+            if (response.isSuccessful && response.body()?.success == true) {
+                Result.success(response.body()!!.data!!)
+            } else {
+                val msg = errorMessage(response, "Failed to delete bus")
                 Result.failure(Exception(msg))
             }
         } catch (e: Exception) {

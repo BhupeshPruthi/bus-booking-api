@@ -135,3 +135,12 @@ data class UpdateBookingStatusRequest(
 data class BookingCancellationRequest(
     @Json(name = "reason") val reason: String? = null
 )
+
+@JsonClass(generateAdapter = true)
+data class DeleteBusResult(
+    @Json(name = "message") val message: String,
+    @Json(name = "busIds") val busIds: List<String>,
+    @Json(name = "mode") val mode: String,
+    @Json(name = "rejectedBookingCount") val rejectedBookingCount: Int = 0,
+    @Json(name = "cancelledBookingCount") val cancelledBookingCount: Int = 0
+)

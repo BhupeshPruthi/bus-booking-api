@@ -45,7 +45,7 @@ class HomeViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(isLoading = true, error = null, isAdmin = isAdmin)
 
             val result = if (isAdmin) {
-                busRepository.getAdminBuses()
+                busRepository.getAdminBuses(status = "scheduled")
             } else {
                 busRepository.getConsumerBuses()
             }

@@ -44,6 +44,13 @@ fun AdminBusDetailScreen(
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
 
+    LaunchedEffect(state.deleteSuccessMessage) {
+        val message = state.deleteSuccessMessage ?: return@LaunchedEffect
+        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        viewModel.consumeDeleteResult()
+        onBack()
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -90,7 +97,7 @@ fun AdminBusDetailScreen(
                 Box(
                     modifier = Modifier.fillMaxSize().padding(innerPadding)
                 ) {
-                    if (state.bookingsLoading) {
+                    if (state.bookingsLoading || state.isDeletingBus) {
                         LinearProgressIndicator(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -187,11 +194,93 @@ fun AdminBusDetailScreen(
                             )
                         }
 
+                        state.bus?.let {
+                            item {
+                                DeleteBusAction(
+                                    isDeleting = state.isDeletingBus,
+                                    error = state.deleteError,
+                                    onDelete = { viewModel.deleteBus() }
+                                )
+                            }
+                        }
+
                         item { Spacer(Modifier.height(16.dp)) }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun DeleteBusAction(
+    isDeleting: Boolean,
+    error: String?,
+    onDelete: () -> Unit
+) {
+    var showDeleteDialog by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        OutlinedButton(
+            onClick = { showDeleteDialog = true },
+            enabled = !isDeleting,
+            modifier = Modifier.fillMaxWidth().height(52.dp),
+            colors = ButtonDefaults.outlinedButtonColors(
+                contentColor = MaterialTheme.colorScheme.error
+            ),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.error)
+        ) {
+            if (isDeleting) {
+                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+            } else {
+                Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+            }
+            Spacer(Modifier.width(8.dp))
+            Text("Delete the Bus")
+        }
+
+        error?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            icon = { Icon(Icons.Filled.Delete, contentDescription = null) },
+            title = { Text("Delete the bus") },
+            text = {
+                Text(
+                    "If this future trip has no bookings, it will be deleted. " +
+                        "If bookings exist, the bus will be cancelled and bookings will be rejected or cancelled."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteDialog = false
+                        onDelete()
+                    },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
+                ) { Text("Delete") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("Keep Bus")
+                }
+            }
+        )
     }
 }
 

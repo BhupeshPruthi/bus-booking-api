@@ -3,6 +3,7 @@ package com.mybus.app.data.remote
 import com.mybus.app.data.remote.dto.*
 import retrofit2.Response
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.PUT
@@ -58,7 +59,12 @@ interface ApiService {
     ): Response<ApiResponse<List<BusListItem>>>
 
     @GET("admin/buses")
-    suspend fun getAdminBuses(): Response<ApiResponse<List<BusListItem>>>
+    suspend fun getAdminBuses(
+        @Query("status") status: String? = null
+    ): Response<ApiResponse<List<BusListItem>>>
+
+    @DELETE("admin/buses/{id}")
+    suspend fun deleteBus(@Path("id") busId: String): Response<ApiResponse<DeleteBusResult>>
 
     @GET("buses/{id}")
     suspend fun getBusDetail(@Path("id") busId: String): Response<ApiResponse<BusDetailData>>

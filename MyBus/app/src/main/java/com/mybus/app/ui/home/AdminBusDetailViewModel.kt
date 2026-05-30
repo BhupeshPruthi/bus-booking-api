@@ -20,7 +20,10 @@ data class AdminBusDetailUiState(
     val bookingsLoading: Boolean = false,
     val bookingsError: String? = null,
     val error: String? = null,
-    val actionInProgress: String? = null
+    val actionInProgress: String? = null,
+    val isDeletingBus: Boolean = false,
+    val deleteError: String? = null,
+    val deleteSuccessMessage: String? = null
 )
 
 @HiltViewModel
@@ -132,6 +135,34 @@ class AdminBusDetailViewModel @Inject constructor(
                     _uiState.value = _uiState.value.copy(actionInProgress = null)
                 }
         }
+    }
+
+    fun deleteBus() {
+        if (busId.isBlank()) return
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                isDeletingBus = true,
+                deleteError = null,
+                deleteSuccessMessage = null
+            )
+            busRepository.deleteBus(busId)
+                .onSuccess { result ->
+                    _uiState.value = _uiState.value.copy(
+                        isDeletingBus = false,
+                        deleteSuccessMessage = result.message
+                    )
+                }
+                .onFailure { error ->
+                    _uiState.value = _uiState.value.copy(
+                        isDeletingBus = false,
+                        deleteError = error.message ?: "Failed to delete bus"
+                    )
+                }
+        }
+    }
+
+    fun consumeDeleteResult() {
+        _uiState.value = _uiState.value.copy(deleteSuccessMessage = null, deleteError = null)
     }
 
     private fun updateStatus(bookingId: String, action: String) {
