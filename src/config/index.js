@@ -20,12 +20,8 @@ const googleClientIds = (process.env.GOOGLE_CLIENT_IDS || process.env.GOOGLE_CLI
   .map((id) => id.trim())
   .filter(Boolean);
 
-function firstEnv(...keys) {
-  for (const key of keys) {
-    const value = process.env[key]?.trim();
-    if (value) return value;
-  }
-  return '';
+function readEnv(key) {
+  return process.env[key]?.trim() || '';
 }
 
 const config = {
@@ -82,13 +78,13 @@ const config = {
   },
 
   s3: {
-    endpoint: firstEnv('S3_ENDPOINT', 'AWS_S3_ENDPOINT', 'AWS_ENDPOINT_URL', 'APP_IMAGES_S3_ENDPOINT'),
-    region: firstEnv('S3_REGION', 'AWS_S3_REGION', 'AWS_DEFAULT_REGION', 'APP_IMAGES_S3_REGION') || 'auto',
-    bucket: firstEnv('S3_BUCKET', 'AWS_S3_BUCKET', 'AWS_S3_BUCKET_NAME', 'APP_IMAGES_S3_BUCKET'),
-    accessKeyId: firstEnv('S3_ACCESS_KEY_ID', 'AWS_S3_ACCESS_KEY_ID', 'AWS_ACCESS_KEY_ID', 'APP_IMAGES_S3_ACCESS_KEY_ID'),
-    secretAccessKey: firstEnv('S3_SECRET_ACCESS_KEY', 'AWS_S3_SECRET_ACCESS_KEY', 'AWS_SECRET_ACCESS_KEY', 'APP_IMAGES_S3_SECRET_ACCESS_KEY'),
-    publicBaseUrl: firstEnv('S3_PUBLIC_BASE_URL', 'AWS_S3_PUBLIC_URL', 'APP_IMAGES_S3_PUBLIC_BASE_URL'),
-    forcePathStyle: firstEnv('S3_FORCE_PATH_STYLE', 'AWS_S3_URL_STYLE', 'APP_IMAGES_S3_URL_STYLE') !== 'virtual',
+    endpoint: readEnv('S3_ENDPOINT'),
+    region: readEnv('S3_REGION') || 'auto',
+    bucket: readEnv('S3_BUCKET'),
+    accessKeyId: readEnv('S3_ACCESS_KEY_ID'),
+    secretAccessKey: readEnv('S3_SECRET_ACCESS_KEY'),
+    publicBaseUrl: readEnv('S3_PUBLIC_BASE_URL'),
+    forcePathStyle: readEnv('S3_FORCE_PATH_STYLE') !== 'virtual',
   },
 };
 

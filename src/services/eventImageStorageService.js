@@ -16,11 +16,11 @@ let client = null;
 
 function getMissingConfigKeys() {
   const required = {
-    'S3_ENDPOINT, AWS_S3_ENDPOINT, AWS_ENDPOINT_URL, or APP_IMAGES_S3_ENDPOINT': config.s3.endpoint,
-    'S3_BUCKET, AWS_S3_BUCKET, AWS_S3_BUCKET_NAME, or APP_IMAGES_S3_BUCKET': config.s3.bucket,
-    'S3_ACCESS_KEY_ID, AWS_S3_ACCESS_KEY_ID, AWS_ACCESS_KEY_ID, or APP_IMAGES_S3_ACCESS_KEY_ID': config.s3.accessKeyId,
-    'S3_SECRET_ACCESS_KEY, AWS_S3_SECRET_ACCESS_KEY, AWS_SECRET_ACCESS_KEY, or APP_IMAGES_S3_SECRET_ACCESS_KEY': config.s3.secretAccessKey,
-    'S3_PUBLIC_BASE_URL, AWS_S3_PUBLIC_URL, or APP_IMAGES_S3_PUBLIC_BASE_URL': config.s3.publicBaseUrl,
+    S3_ENDPOINT: config.s3.endpoint,
+    S3_BUCKET: config.s3.bucket,
+    S3_ACCESS_KEY_ID: config.s3.accessKeyId,
+    S3_SECRET_ACCESS_KEY: config.s3.secretAccessKey,
+    S3_PUBLIC_BASE_URL: config.s3.publicBaseUrl,
   };
 
   return Object.entries(required)
