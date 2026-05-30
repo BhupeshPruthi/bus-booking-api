@@ -35,6 +35,10 @@ function makeQuery(table, fixture) {
       firstOnly = true;
       return query;
     },
+    count(aliasExpression) {
+      aggregate = { type: 'count', expression: aliasExpression };
+      return query;
+    },
     sum(aliasExpression) {
       aggregate = { type: 'sum', expression: aliasExpression };
       return query;
@@ -81,6 +85,9 @@ function makeQuery(table, fixture) {
 
       if (aggregate) {
         const [column, alias] = aggregate.expression.split(/\s+as\s+/i);
+        if (aggregate.type === 'count') {
+          return { [alias]: matchingRows.filter((row) => row[column] != null).length };
+        }
         const values = matchingRows
           .map((row) => parseInt(row[column], 10))
           .filter((value) => Number.isFinite(value));
@@ -124,13 +131,13 @@ function loadPoojaServiceWithFixture(fixture) {
   return require(poojaServicePath);
 }
 
-test('bookToken consumes capacity by member count and assigns next per-pooja token number', async () => {
+test('bookToken consumes one token per booking request and keeps member count as metadata', async () => {
   const fixture = {
     poojas: [
       {
         id: 'pooja-1',
         scheduled_at: '2099-01-01T10:00:00.000Z',
-        total_tokens: 5,
+        total_tokens: 2,
         status: 'scheduled',
       },
     ],
@@ -143,23 +150,23 @@ test('bookToken consumes capacity by member count and assigns next per-pooja tok
   const booking = await poojaService.bookToken('pooja-1', 'user-1', {
     name: 'Asha',
     phone: '9999999999',
-    memberCount: 2,
+    memberCount: 5,
     city: '',
   });
 
-  assert.equal(booking.memberCount, 2);
+  assert.equal(booking.memberCount, 5);
   assert.equal(booking.city, 'Delhi - NCR');
   assert.equal(booking.tokenNumber, 2);
-  assert.equal(await poojaService.getBookedTokensCount('pooja-1'), 5);
+  assert.equal(await poojaService.getBookedTokensCount('pooja-1'), 2);
 });
 
-test('bookToken rejects member count above available capacity', async () => {
+test('bookToken rejects only when confirmed booking count reaches capacity', async () => {
   const fixture = {
     poojas: [
       {
         id: 'pooja-1',
         scheduled_at: '2099-01-01T10:00:00.000Z',
-        total_tokens: 4,
+        total_tokens: 1,
         status: 'scheduled',
       },
     ],
@@ -173,7 +180,7 @@ test('bookToken rejects member count above available capacity', async () => {
     () => poojaService.bookToken('pooja-1', 'user-1', {
       name: 'Asha',
       phone: '9999999999',
-      memberCount: 2,
+      memberCount: 10,
       city: 'Noida',
     }),
     /No tokens available/

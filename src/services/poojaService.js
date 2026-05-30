@@ -98,11 +98,11 @@ class PoojaService {
       const countRow = await trx('pooja_bookings')
         .where('pooja_id', poojaId)
         .where('status', 'confirmed')
-        .sum('member_count as count')
+        .count('id as count')
         .first();
       const bookedTokens = parseInt(countRow?.count || 0, 10);
 
-      if (bookedTokens + memberCount > pooja.total_tokens) {
+      if (bookedTokens + 1 > pooja.total_tokens) {
         throw new ConflictError('No tokens available for this pooja');
       }
 
@@ -188,7 +188,7 @@ class PoojaService {
     const row = await db('pooja_bookings')
       .where('pooja_id', poojaId)
       .where('status', 'confirmed')
-      .sum('member_count as count')
+      .count('id as count')
       .first();
     return parseInt(row?.count || 0, 10);
   }
@@ -198,7 +198,7 @@ class PoojaService {
 
     const rows = await db('pooja_bookings')
       .select('pooja_id')
-      .sum('member_count as count')
+      .count('id as count')
       .whereIn('pooja_id', poojaIds)
       .where('status', 'confirmed')
       .groupBy('pooja_id');

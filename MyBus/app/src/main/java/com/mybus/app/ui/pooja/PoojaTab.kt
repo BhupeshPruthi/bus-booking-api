@@ -16,8 +16,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
@@ -29,6 +33,8 @@ import com.mybus.app.data.remote.dto.PoojaListItem
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+
+private const val DEFAULT_POOJA_CITY = "Delhi - NCR"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,8 +59,11 @@ fun PoojaTab(
             title = { Text("Token Booked") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    booking.tokenNumber?.let { Text("Token: #$it") }
                     Text("Name: ${booking.name}")
                     Text("Phone: ${booking.phone}")
+                    Text("Members: ${booking.memberCount}")
+                    Text("City: ${booking.city}")
                     Text("Status: ${booking.status.replaceFirstChar { it.uppercase() }}")
                 }
             },
@@ -69,10 +78,14 @@ fun PoojaTab(
             pooja = listState.bookingPooja!!,
             name = listState.bookingName,
             phone = listState.bookingPhone,
+            memberCount = listState.bookingMemberCount,
+            city = listState.bookingCity,
             isLoading = listState.bookingLoading,
             error = listState.bookingError,
             onNameChange = { listViewModel.updateBookingName(it) },
             onPhoneChange = { listViewModel.updateBookingPhone(it) },
+            onMemberCountChange = { listViewModel.updateBookingMemberCount(it) },
+            onCityChange = { listViewModel.updateBookingCity(it) },
             onDismiss = { listViewModel.closeBookingDialog() },
             onConfirm = { listViewModel.bookSelectedPoojaToken() }
         )
@@ -289,13 +302,19 @@ private fun QuickBookingDialog(
     pooja: PoojaListItem,
     name: String,
     phone: String,
+    memberCount: String,
+    city: String,
     isLoading: Boolean,
     error: String?,
     onNameChange: (String) -> Unit,
     onPhoneChange: (String) -> Unit,
+    onMemberCountChange: (String) -> Unit,
+    onCityChange: (String) -> Unit,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
+    var cityPrefillCleared by remember { mutableStateOf(false) }
+
     AlertDialog(
         onDismissRequest = { if (!isLoading) onDismiss() },
         title = { Text("Book Pooja") },
@@ -340,6 +359,46 @@ private fun QuickBookingDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
+                OutlinedTextField(
+                    value = memberCount,
+                    onValueChange = { raw ->
+                        val filtered = raw
+                            .filter { it.isDigit() }
+                            .take(2)
+                        onMemberCountChange(filtered)
+                    },
+                    label = { Text("Members") },
+                    supportingText = { Text("Available tokens: ${pooja.availableTokens}") },
+                    singleLine = true,
+                    enabled = !isLoading,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = city,
+                    onValueChange = { raw -> onCityChange(raw.take(100)) },
+                    label = { Text("City") },
+                    singleLine = true,
+                    enabled = !isLoading,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Text,
+                        capitalization = KeyboardCapitalization.Words
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onFocusChanged { focusState ->
+                            if (
+                                focusState.isFocused &&
+                                !cityPrefillCleared &&
+                                city == DEFAULT_POOJA_CITY
+                            ) {
+                                cityPrefillCleared = true
+                                onCityChange("")
+                            }
+                        }
+                )
+
                 error?.let {
                     Text(
                         text = it,
@@ -374,4 +433,3 @@ private fun formatDateTime(isoString: String): String {
         isoString
     }
 }
-

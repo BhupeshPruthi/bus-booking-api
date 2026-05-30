@@ -95,9 +95,18 @@ class PoojaRepository @Inject constructor(
         }
     }
 
-    suspend fun bookToken(poojaId: String, name: String, phone: String): Result<PoojaBookingData> {
+    suspend fun bookToken(
+        poojaId: String,
+        name: String,
+        phone: String,
+        memberCount: Int,
+        city: String
+    ): Result<PoojaBookingData> {
         return try {
-            val response = apiService.bookPoojaToken(poojaId, BookPoojaRequest(name, phone))
+            val response = apiService.bookPoojaToken(
+                poojaId,
+                BookPoojaRequest(name, phone, memberCount, city)
+            )
             if (response.isSuccessful && response.body()?.success == true) {
                 Result.success(response.body()!!.data!!)
             } else {
@@ -108,5 +117,21 @@ class PoojaRepository @Inject constructor(
             Result.failure(Exception("Network error: ${e.message}"))
         }
     }
-}
 
+    suspend fun cancelPoojaBookingAsAdmin(
+        poojaId: String,
+        bookingId: String
+    ): Result<PoojaBookingData> {
+        return try {
+            val response = apiService.cancelPoojaBookingAsAdmin(poojaId, bookingId)
+            if (response.isSuccessful && response.body()?.success == true) {
+                Result.success(response.body()!!.data!!)
+            } else {
+                val msg = errorMessage(response, "Failed to cancel token")
+                Result.failure(Exception(msg))
+            }
+        } catch (e: Exception) {
+            Result.failure(Exception("Network error: ${e.message}"))
+        }
+    }
+}

@@ -13,7 +13,9 @@ data class CreatePoojaRequest(
 @JsonClass(generateAdapter = true)
 data class BookPoojaRequest(
     @Json(name = "name") val name: String,
-    @Json(name = "phone") val phone: String
+    @Json(name = "phone") val phone: String,
+    @Json(name = "memberCount") val memberCount: Int,
+    @Json(name = "city") val city: String
 )
 
 @JsonClass(generateAdapter = true)
@@ -41,7 +43,11 @@ data class PoojaBookingData(
     @Json(name = "userId") val userId: String? = null,
     @Json(name = "name") val name: String,
     @Json(name = "phone") val phone: String,
+    @Json(name = "memberCount") val memberCount: Int = 1,
+    @Json(name = "city") val city: String = "Delhi - NCR",
+    @Json(name = "tokenNumber") val tokenNumber: Int? = null,
     @Json(name = "status") val status: String,
+    @Json(name = "cancelledAt") val cancelledAt: String? = null,
     @Json(name = "createdAt") val createdAt: String? = null,
     @Json(name = "user") val user: PoojaBookingUserInfo? = null
 )
@@ -58,4 +64,3 @@ data class PoojaDetailData(
     @Json(name = "createdAt") val createdAt: String? = null,
     @Json(name = "bookings") val bookings: List<PoojaBookingData>? = null
 )
-

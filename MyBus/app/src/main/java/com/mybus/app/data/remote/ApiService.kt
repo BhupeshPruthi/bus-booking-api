@@ -51,6 +51,12 @@ interface ApiService {
     @GET("admin/poojas/{id}")
     suspend fun getAdminPoojaDetail(@Path("id") poojaId: String): Response<ApiResponse<PoojaDetailData>>
 
+    @POST("admin/poojas/{poojaId}/bookings/{bookingId}/cancel")
+    suspend fun cancelPoojaBookingAsAdmin(
+        @Path("poojaId") poojaId: String,
+        @Path("bookingId") bookingId: String
+    ): Response<ApiResponse<PoojaBookingData>>
+
     @GET("buses")
     suspend fun getBuses(
         @Query("source") source: String? = null,

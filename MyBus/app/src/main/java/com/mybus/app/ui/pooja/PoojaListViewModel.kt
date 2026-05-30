@@ -24,10 +24,15 @@ data class PoojaListUiState(
     val bookingPooja: PoojaListItem? = null,
     val bookingName: String = "",
     val bookingPhone: String = "",
+    val bookingMemberCount: String = "1",
+    val bookingCity: String = DEFAULT_POOJA_CITY,
     val bookingLoading: Boolean = false,
     val bookingSuccess: PoojaBookingData? = null,
     val bookingError: String? = null
 )
+
+private const val DEFAULT_POOJA_CITY = "Delhi - NCR"
+private const val MAX_POOJA_MEMBERS = 10
 
 @HiltViewModel
 class PoojaListViewModel @Inject constructor(
@@ -91,6 +96,8 @@ class PoojaListViewModel @Inject constructor(
                 bookingPooja = pooja,
                 bookingName = defaultName,
                 bookingPhone = defaultPhone,
+                bookingMemberCount = "1",
+                bookingCity = DEFAULT_POOJA_CITY,
                 bookingLoading = false,
                 bookingError = null,
                 bookingSuccess = null
@@ -116,6 +123,17 @@ class PoojaListViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(bookingPhone = filtered, bookingError = null)
     }
 
+    fun updateBookingMemberCount(value: String) {
+        val filtered = value
+            .filter { it.isDigit() }
+            .take(2)
+        _uiState.value = _uiState.value.copy(bookingMemberCount = filtered, bookingError = null)
+    }
+
+    fun updateBookingCity(value: String) {
+        _uiState.value = _uiState.value.copy(bookingCity = value.take(100), bookingError = null)
+    }
+
     fun clearBookingError() {
         _uiState.value = _uiState.value.copy(bookingError = null)
     }
@@ -133,6 +151,8 @@ class PoojaListViewModel @Inject constructor(
 
         val name = state.bookingName.trim()
         val phone = state.bookingPhone.trim()
+        val memberCount = state.bookingMemberCount.toIntOrNull()
+        val city = state.bookingCity.trim().ifBlank { DEFAULT_POOJA_CITY }
 
         if (name.isBlank()) {
             _uiState.value = state.copy(bookingError = "Please enter your name")
@@ -146,6 +166,14 @@ class PoojaListViewModel @Inject constructor(
             _uiState.value = state.copy(bookingError = "Please enter a valid phone number")
             return
         }
+        if (memberCount == null || memberCount !in 1..MAX_POOJA_MEMBERS) {
+            _uiState.value = state.copy(bookingError = "Members must be between 1 and $MAX_POOJA_MEMBERS")
+            return
+        }
+        if (city.isBlank()) {
+            _uiState.value = state.copy(bookingError = "Please enter your city")
+            return
+        }
         if (pooja.availableTokens <= 0) {
             _uiState.value = state.copy(bookingError = "No tokens available for this pooja")
             return
@@ -153,7 +181,7 @@ class PoojaListViewModel @Inject constructor(
 
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(bookingLoading = true, bookingError = null)
-            poojaRepository.bookToken(pooja.id, name, phone)
+            poojaRepository.bookToken(pooja.id, name, phone, memberCount, city)
                 .onSuccess { booking ->
                     val existingName = tokenManager.userName.firstOrNull().orEmpty()
                     if (existingName.isBlank() && name.isNotBlank()) {
@@ -176,4 +204,3 @@ class PoojaListViewModel @Inject constructor(
         }
     }
 }
-

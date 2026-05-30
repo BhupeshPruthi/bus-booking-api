@@ -14,8 +14,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
@@ -29,6 +33,8 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
+private const val DEFAULT_POOJA_CITY = "Delhi - NCR"
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PoojaDetailScreen(
@@ -37,6 +43,7 @@ fun PoojaDetailScreen(
     viewModel: PoojaDetailViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
+    var bookingToCancel by remember { mutableStateOf<PoojaBookingData?>(null) }
 
     LaunchedEffect(isAdmin) {
         viewModel.load(isAdmin)
@@ -60,8 +67,11 @@ fun PoojaDetailScreen(
             title = { Text("Token Booked") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    booking.tokenNumber?.let { Text("Token: #$it") }
                     Text("Name: ${booking.name}")
                     Text("Phone: ${booking.phone}")
+                    Text("Members: ${booking.memberCount}")
+                    Text("City: ${booking.city}")
                     Text("Status: ${booking.status.replaceFirstChar { it.uppercase() }}")
                 }
             },
@@ -75,11 +85,53 @@ fun PoojaDetailScreen(
         BookingDialog(
             name = state.bookingName,
             phone = state.bookingPhone,
+            memberCount = state.bookingMemberCount,
+            city = state.bookingCity,
+            availableTokens = state.pooja?.availableTokens,
             isLoading = state.bookingLoading,
             onNameChange = { viewModel.updateBookingName(it) },
             onPhoneChange = { viewModel.updateBookingPhone(it) },
+            onMemberCountChange = { viewModel.updateBookingMemberCount(it) },
+            onCityChange = { viewModel.updateBookingCity(it) },
             onDismiss = { viewModel.closeBookingDialog() },
             onConfirm = { viewModel.bookToken() }
+        )
+    }
+
+    bookingToCancel?.let { booking ->
+        val isCancelling = state.cancelInProgressId == booking.id
+        AlertDialog(
+            onDismissRequest = { if (!isCancelling) bookingToCancel = null },
+            title = { Text("Cancel Token") },
+            text = {
+                Text(
+                    "Cancel token ${booking.tokenNumber?.let { "#$it" } ?: booking.name}? " +
+                        "This will release this pooja token for another booking request."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.cancelBookingAsAdmin(booking.id)
+                        bookingToCancel = null
+                    },
+                    enabled = !isCancelling,
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    if (isCancelling) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                    } else {
+                        Text("Cancel Token")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { bookingToCancel = null }, enabled = !isCancelling) {
+                    Text("Keep")
+                }
+            }
         )
     }
 
@@ -169,8 +221,14 @@ fun PoojaDetailScreen(
                                     )
                                 }
                             } else {
+                                val canCancelTokens = isFutureDateTime(pooja.scheduledAt)
                                 items(bookings, key = { it.id }) { booking ->
-                                    BookingRow(booking)
+                                    BookingRow(
+                                        booking = booking,
+                                        canCancel = canCancelTokens && booking.status == "confirmed",
+                                        isCancelling = state.cancelInProgressId == booking.id,
+                                        onCancel = { bookingToCancel = booking }
+                                    )
                                 }
                             }
                         }
@@ -244,16 +302,46 @@ private fun PoojaSummaryCard(pooja: PoojaDetailData) {
 }
 
 @Composable
-private fun BookingRow(booking: PoojaBookingData) {
+private fun BookingRow(
+    booking: PoojaBookingData,
+    canCancel: Boolean,
+    isCancelling: Boolean,
+    onCancel: () -> Unit
+) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(14.dp)) {
-            Text(
-                text = booking.name,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = booking.name,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    booking.tokenNumber?.let {
+                        Text(
+                            text = "Token #$it",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+                AssistChip(
+                    onClick = {},
+                    enabled = false,
+                    label = {
+                        Text(
+                            text = booking.status.replaceFirstChar { it.uppercase() },
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                )
+            }
             Spacer(Modifier.height(4.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
@@ -269,6 +357,19 @@ private fun BookingRow(booking: PoojaBookingData) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = "Members: ${booking.memberCount}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = "City: ${booking.city}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
             booking.createdAt?.let {
                 Spacer(Modifier.height(6.dp))
                 Text(
@@ -276,6 +377,31 @@ private fun BookingRow(booking: PoojaBookingData) {
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.outline
                 )
+            }
+            booking.cancelledAt?.let {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = "Cancelled: ${formatDateTime(it)}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline
+                )
+            }
+            if (canCancel) {
+                Spacer(Modifier.height(10.dp))
+                OutlinedButton(
+                    onClick = onCancel,
+                    enabled = !isCancelling,
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    if (isCancelling) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                    } else {
+                        Text("Cancel Token")
+                    }
+                }
             }
         }
     }
@@ -285,14 +411,21 @@ private fun BookingRow(booking: PoojaBookingData) {
 private fun BookingDialog(
     name: String,
     phone: String,
+    memberCount: String,
+    city: String,
+    availableTokens: Int?,
     isLoading: Boolean,
     onNameChange: (String) -> Unit,
     onPhoneChange: (String) -> Unit,
+    onMemberCountChange: (String) -> Unit,
+    onCityChange: (String) -> Unit,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
+    var cityPrefillCleared by remember { mutableStateOf(false) }
+
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { if (!isLoading) onDismiss() },
         title = { Text("Book Token") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -306,6 +439,7 @@ private fun BookingDialog(
                     },
                     label = { Text("Name") },
                     singleLine = true,
+                    enabled = !isLoading,
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Text,
                         capitalization = KeyboardCapitalization.Words
@@ -317,7 +451,47 @@ private fun BookingDialog(
                     onValueChange = { if (it.length <= 15 && it.all { c -> c.isDigit() }) onPhoneChange(it) },
                     label = { Text("Phone") },
                     singleLine = true,
+                    enabled = !isLoading,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                     modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = memberCount,
+                    onValueChange = { raw ->
+                        val filtered = raw
+                            .filter { it.isDigit() }
+                            .take(2)
+                        onMemberCountChange(filtered)
+                    },
+                    label = { Text("Members") },
+                    supportingText = availableTokens?.let { { Text("Available tokens: $it") } },
+                    singleLine = true,
+                    enabled = !isLoading,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = city,
+                    onValueChange = { raw -> onCityChange(raw.take(100)) },
+                    label = { Text("City") },
+                    singleLine = true,
+                    enabled = !isLoading,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Text,
+                        capitalization = KeyboardCapitalization.Words
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onFocusChanged { focusState ->
+                            if (
+                                focusState.isFocused &&
+                                !cityPrefillCleared &&
+                                city == DEFAULT_POOJA_CITY
+                            ) {
+                                cityPrefillCleared = true
+                                onCityChange("")
+                            }
+                        }
                 )
             }
         },
@@ -336,6 +510,14 @@ private fun BookingDialog(
     )
 }
 
+private fun isFutureDateTime(isoString: String): Boolean {
+    return try {
+        Instant.parse(isoString).isAfter(Instant.now())
+    } catch (_: Exception) {
+        false
+    }
+}
+
 private fun formatDateTime(isoString: String): String {
     return try {
         val instant = Instant.parse(isoString)
@@ -346,4 +528,3 @@ private fun formatDateTime(isoString: String): String {
         isoString
     }
 }
-

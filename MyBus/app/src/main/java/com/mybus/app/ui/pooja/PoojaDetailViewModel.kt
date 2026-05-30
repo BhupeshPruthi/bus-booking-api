@@ -24,9 +24,15 @@ data class PoojaDetailUiState(
     val showBookingDialog: Boolean = false,
     val bookingName: String = "",
     val bookingPhone: String = "",
+    val bookingMemberCount: String = "1",
+    val bookingCity: String = DEFAULT_POOJA_CITY,
     val bookingLoading: Boolean = false,
-    val bookingSuccess: PoojaBookingData? = null
+    val bookingSuccess: PoojaBookingData? = null,
+    val cancelInProgressId: String? = null
 )
+
+private const val DEFAULT_POOJA_CITY = "Delhi - NCR"
+private const val MAX_POOJA_MEMBERS = 10
 
 @HiltViewModel
 class PoojaDetailViewModel @Inject constructor(
@@ -80,6 +86,8 @@ class PoojaDetailViewModel @Inject constructor(
                 showBookingDialog = true,
                 bookingName = defaultName,
                 bookingPhone = defaultPhone,
+                bookingMemberCount = "1",
+                bookingCity = DEFAULT_POOJA_CITY,
                 bookingSuccess = null
             )
         }
@@ -97,6 +105,17 @@ class PoojaDetailViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(bookingPhone = value)
     }
 
+    fun updateBookingMemberCount(value: String) {
+        val filtered = value
+            .filter { it.isDigit() }
+            .take(2)
+        _uiState.value = _uiState.value.copy(bookingMemberCount = filtered)
+    }
+
+    fun updateBookingCity(value: String) {
+        _uiState.value = _uiState.value.copy(bookingCity = value.take(100))
+    }
+
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
     }
@@ -109,6 +128,8 @@ class PoojaDetailViewModel @Inject constructor(
         val state = _uiState.value
         val name = state.bookingName.trim()
         val phone = state.bookingPhone.trim()
+        val memberCount = state.bookingMemberCount.toIntOrNull()
+        val city = state.bookingCity.trim().ifBlank { DEFAULT_POOJA_CITY }
 
         if (name.isBlank()) {
             _uiState.value = state.copy(error = "Please enter your name")
@@ -122,11 +143,18 @@ class PoojaDetailViewModel @Inject constructor(
             _uiState.value = state.copy(error = "Please enter a valid phone number")
             return
         }
-
+        if (memberCount == null || memberCount !in 1..MAX_POOJA_MEMBERS) {
+            _uiState.value = state.copy(error = "Members must be between 1 and $MAX_POOJA_MEMBERS")
+            return
+        }
+        if (city.isBlank()) {
+            _uiState.value = state.copy(error = "Please enter your city")
+            return
+        }
         viewModelScope.launch {
-            Log.d("PoojaUI", "Booking token poojaId=$poojaId name=$name phone=$phone")
+            Log.d("PoojaUI", "Booking token poojaId=$poojaId name=$name phone=$phone members=$memberCount city=$city")
             _uiState.value = _uiState.value.copy(bookingLoading = true, error = null)
-            poojaRepository.bookToken(poojaId, name, phone)
+            poojaRepository.bookToken(poojaId, name, phone, memberCount, city)
                 .onSuccess { booking ->
                     Log.d("PoojaUI", "Booking success id=${booking.id} status=${booking.status}")
                     val existingName = tokenManager.userName.firstOrNull().orEmpty()
@@ -149,5 +177,22 @@ class PoojaDetailViewModel @Inject constructor(
                 }
         }
     }
-}
 
+    fun cancelBookingAsAdmin(bookingId: String) {
+        if (poojaId.isBlank()) return
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(cancelInProgressId = bookingId, error = null)
+            poojaRepository.cancelPoojaBookingAsAdmin(poojaId, bookingId)
+                .onSuccess {
+                    _uiState.value = _uiState.value.copy(cancelInProgressId = null)
+                    load(true)
+                }
+                .onFailure { e ->
+                    _uiState.value = _uiState.value.copy(
+                        cancelInProgressId = null,
+                        error = e.message ?: "Failed to cancel token"
+                    )
+                }
+        }
+    }
+}
