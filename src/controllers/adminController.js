@@ -10,6 +10,11 @@ const getAllBuses = asyncHandler(async (req, res) => {
   res.json({ success: true, data: result });
 });
 
+const deleteBus = asyncHandler(async (req, res) => {
+  const result = await busService.deleteBus(req.params.id, req.user.id);
+  res.json({ success: true, data: result });
+});
+
 const getAllBookings = asyncHandler(async (req, res) => {
   const result = await bookingService.getAllBookings(req.query);
   res.json({ success: true, data: result });
@@ -62,6 +67,7 @@ const createEvent = asyncHandler(async (req, res) => {
 
 module.exports = {
   getAllBuses,
+  deleteBus,
   getAllBookings,
   processBookingRequest,
   cancelBooking,

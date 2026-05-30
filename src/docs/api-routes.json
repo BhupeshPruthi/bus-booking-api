@@ -36,6 +36,7 @@
     { "method": "GET", "path": "/api/admin/poojas", "auth": "bearer+adminOrSuperuser", "group": "admin" },
     { "method": "GET", "path": "/api/admin/poojas/:id", "auth": "bearer+adminOrSuperuser", "group": "admin" },
     { "method": "GET", "path": "/api/admin/buses", "auth": "bearer+adminOrSuperuser", "group": "admin" },
+    { "method": "DELETE", "path": "/api/admin/buses/:id", "auth": "bearer+adminOrSuperuser", "group": "admin" },
     { "method": "GET", "path": "/api/admin/bookings", "auth": "bearer+adminOrSuperuser", "group": "admin" },
     { "method": "PUT", "path": "/api/admin/bookings/:id/status", "auth": "bearer+adminOrSuperuser", "group": "admin" },
     { "method": "POST", "path": "/api/admin/bookings/:id/cancel", "auth": "bearer+adminOrSuperuser", "group": "admin" }
@@ -57,6 +58,7 @@
       "events",
       "buses",
       "admin/buses",
+      "admin/buses/{id}",
       "buses/{id}",
       "bookings",
       "bookings/{id}",

@@ -1,6 +1,13 @@
 const { db } = require('../config/database');
 const { NotFoundError, ValidationError } = require('../utils/errors');
 const seatAvailability = require('./seatAvailabilityService');
+const {
+  BUS_CANCELLED_BY_ADMIN_REASON,
+  getDeleteTargetBusIds,
+  assertBusesAreFuture,
+  splitBookingsForBusDeletion,
+  buildBusDeletionResult,
+} = require('./busDeletionPolicy');
 
 class BusService {
   /**
@@ -247,6 +254,96 @@ class BusService {
       .update({ status: 'cancelled', updated_at: new Date() });
 
     return { message: 'Bus trip cancelled successfully' };
+  }
+
+  /**
+   * Admin delete flow:
+   * - future buses with no bookings are physically deleted
+   * - future buses with bookings are cancelled so booking history remains intact
+   */
+  async deleteBus(busId, adminId) {
+    return db.transaction(async (trx) => {
+      const selectedBus = await trx('buses')
+        .where('id', busId)
+        .forUpdate()
+        .first();
+
+      if (!selectedBus) {
+        throw new NotFoundError('Bus');
+      }
+
+      const linkedBuses = await trx('buses')
+        .select('id', 'return_bus_id')
+        .where('return_bus_id', selectedBus.id);
+      const busIds = getDeleteTargetBusIds(selectedBus, linkedBuses);
+      const targetBuses = await trx('buses')
+        .whereIn('id', busIds)
+        .forUpdate();
+      const now = new Date();
+
+      assertBusesAreFuture(targetBuses, now);
+
+      const bookings = await trx('bookings')
+        .select('id', 'status')
+        .whereIn('bus_id', busIds);
+
+      if (bookings.length === 0) {
+        await trx('buses')
+          .whereIn('return_bus_id', busIds)
+          .update({ return_bus_id: null, updated_at: now });
+        await trx('buses')
+          .whereIn('id', busIds)
+          .update({ return_bus_id: null, updated_at: now });
+        await trx('buses')
+          .whereIn('id', busIds)
+          .del();
+
+        return buildBusDeletionResult({ busIds, mode: 'deleted' });
+      }
+
+      const { rejectIds, cancelIds } = splitBookingsForBusDeletion(bookings);
+
+      await trx('buses')
+        .whereIn('id', busIds)
+        .update({ status: 'cancelled', updated_at: now });
+
+      let rejectedBookingCount = 0;
+      if (rejectIds.length > 0) {
+        const rejectedRows = await trx('bookings')
+          .whereIn('id', rejectIds)
+          .update({
+            status: 'rejected',
+            cancellation_reason: BUS_CANCELLED_BY_ADMIN_REASON,
+            cancelled_at: now,
+            cancelled_by: adminId,
+            updated_at: now,
+          })
+          .returning('id');
+        rejectedBookingCount = rejectedRows.length;
+      }
+
+      let cancelledBookingCount = 0;
+      if (cancelIds.length > 0) {
+        const cancelledRows = await trx('bookings')
+          .whereIn('id', cancelIds)
+          .update({
+            status: 'cancelled',
+            cancellation_reason: BUS_CANCELLED_BY_ADMIN_REASON,
+            cancelled_at: now,
+            cancelled_by: adminId,
+            updated_at: now,
+          })
+          .returning('id');
+        cancelledBookingCount = cancelledRows.length;
+      }
+
+      return buildBusDeletionResult({
+        busIds,
+        mode: 'cancelled',
+        rejectedBookingCount,
+        cancelledBookingCount,
+      });
+    });
   }
 
   /**

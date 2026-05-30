@@ -65,6 +65,13 @@ router.get('/poojas/:id', adminController.getAdminPoojaById);
 router.get('/buses', adminController.getAllBuses);
 
 /**
+ * @route DELETE /api/admin/buses/:id
+ * @desc Delete a future bus or cancel it if bookings exist
+ * @access Admin
+ */
+router.delete('/buses/:id', adminController.deleteBus);
+
+/**
  * @route GET /api/admin/bookings
  * @desc Get all bookings with filters
  * @access Admin
