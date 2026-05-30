@@ -3,14 +3,12 @@ package com.mybus.app.ui.pooja
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mybus.app.data.local.TokenManager
-import com.mybus.app.data.remote.dto.PoojaBookingData
 import com.mybus.app.data.remote.dto.PoojaListItem
 import com.mybus.app.data.repository.PoojaRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -18,21 +16,8 @@ data class PoojaListUiState(
     val isLoading: Boolean = false,
     val poojas: List<PoojaListItem> = emptyList(),
     val isAdmin: Boolean = false,
-    val error: String? = null,
-
-    val showBookingDialog: Boolean = false,
-    val bookingPooja: PoojaListItem? = null,
-    val bookingName: String = "",
-    val bookingPhone: String = "",
-    val bookingMemberCount: String = "1",
-    val bookingCity: String = DEFAULT_POOJA_CITY,
-    val bookingLoading: Boolean = false,
-    val bookingSuccess: PoojaBookingData? = null,
-    val bookingError: String? = null
+    val error: String? = null
 )
-
-private const val DEFAULT_POOJA_CITY = "Delhi - NCR"
-private const val MAX_POOJA_MEMBERS = 10
 
 @HiltViewModel
 class PoojaListViewModel @Inject constructor(
@@ -70,137 +55,6 @@ class PoojaListViewModel @Inject constructor(
                     error = e.message ?: "Failed to load poojas"
                 )
             }
-        }
-    }
-
-    fun openBookingDialog(pooja: PoojaListItem) {
-        if (pooja.availableTokens <= 0) {
-            _uiState.value = _uiState.value.copy(
-                bookingError = "No tokens available for this pooja"
-            )
-            return
-        }
-
-        viewModelScope.launch {
-            val defaultName = tokenManager.userName.firstOrNull()
-                .orEmpty()
-                .filter { it.isLetter() || it.isWhitespace() }
-                .take(50)
-            val defaultPhone = tokenManager.userMobile.firstOrNull()
-                .orEmpty()
-                .filter { it.isDigit() }
-                .take(15)
-
-            _uiState.value = _uiState.value.copy(
-                showBookingDialog = true,
-                bookingPooja = pooja,
-                bookingName = defaultName,
-                bookingPhone = defaultPhone,
-                bookingMemberCount = "1",
-                bookingCity = DEFAULT_POOJA_CITY,
-                bookingLoading = false,
-                bookingError = null,
-                bookingSuccess = null
-            )
-        }
-    }
-
-    fun closeBookingDialog() {
-        _uiState.value = _uiState.value.copy(showBookingDialog = false)
-    }
-
-    fun updateBookingName(value: String) {
-        val filtered = value
-            .filter { it.isLetter() || it.isWhitespace() }
-            .take(50)
-        _uiState.value = _uiState.value.copy(bookingName = filtered, bookingError = null)
-    }
-
-    fun updateBookingPhone(value: String) {
-        val filtered = value
-            .filter { it.isDigit() }
-            .take(15)
-        _uiState.value = _uiState.value.copy(bookingPhone = filtered, bookingError = null)
-    }
-
-    fun updateBookingMemberCount(value: String) {
-        val filtered = value
-            .filter { it.isDigit() }
-            .take(2)
-        _uiState.value = _uiState.value.copy(bookingMemberCount = filtered, bookingError = null)
-    }
-
-    fun updateBookingCity(value: String) {
-        _uiState.value = _uiState.value.copy(bookingCity = value.take(100), bookingError = null)
-    }
-
-    fun clearBookingError() {
-        _uiState.value = _uiState.value.copy(bookingError = null)
-    }
-
-    fun dismissBookingSuccess() {
-        _uiState.value = _uiState.value.copy(bookingSuccess = null)
-    }
-
-    fun bookSelectedPoojaToken() {
-        val state = _uiState.value
-        val pooja = state.bookingPooja ?: run {
-            _uiState.value = state.copy(bookingError = "Please select a pooja")
-            return
-        }
-
-        val name = state.bookingName.trim()
-        val phone = state.bookingPhone.trim()
-        val memberCount = state.bookingMemberCount.toIntOrNull()
-        val city = state.bookingCity.trim().ifBlank { DEFAULT_POOJA_CITY }
-
-        if (name.isBlank()) {
-            _uiState.value = state.copy(bookingError = "Please enter your name")
-            return
-        }
-        if (!name.matches(Regex("^[\\p{L} ]+$"))) {
-            _uiState.value = state.copy(bookingError = "Name should contain only letters")
-            return
-        }
-        if (!phone.matches(Regex("^[0-9]{10,15}$"))) {
-            _uiState.value = state.copy(bookingError = "Please enter a valid phone number")
-            return
-        }
-        if (memberCount == null || memberCount !in 1..MAX_POOJA_MEMBERS) {
-            _uiState.value = state.copy(bookingError = "Members must be between 1 and $MAX_POOJA_MEMBERS")
-            return
-        }
-        if (city.isBlank()) {
-            _uiState.value = state.copy(bookingError = "Please enter your city")
-            return
-        }
-        if (pooja.availableTokens <= 0) {
-            _uiState.value = state.copy(bookingError = "No tokens available for this pooja")
-            return
-        }
-
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(bookingLoading = true, bookingError = null)
-            poojaRepository.bookToken(pooja.id, name, phone, memberCount, city)
-                .onSuccess { booking ->
-                    val existingName = tokenManager.userName.firstOrNull().orEmpty()
-                    if (existingName.isBlank() && name.isNotBlank()) {
-                        tokenManager.updateUserName(name)
-                    }
-
-                    _uiState.value = _uiState.value.copy(
-                        bookingLoading = false,
-                        showBookingDialog = false,
-                        bookingSuccess = booking
-                    )
-                    loadPoojas()
-                }
-                .onFailure { e ->
-                    _uiState.value = _uiState.value.copy(
-                        bookingLoading = false,
-                        bookingError = e.message ?: "Failed to book token"
-                    )
-                }
         }
     }
 }

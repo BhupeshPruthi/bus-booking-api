@@ -1,7 +1,14 @@
 package com.mybus.app.ui.pooja
 
+import android.content.ClipData
+import android.content.Context
+import android.content.Intent
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Typeface
+import android.graphics.pdf.PdfDocument
+import android.widget.Toast
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -9,6 +16,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.ConfirmationNumber
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -19,30 +27,31 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.mybus.app.data.remote.dto.PoojaBookingData
 import com.mybus.app.data.remote.dto.PoojaDetailData
+import java.io.File
+import java.io.FileOutputStream
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-
-private const val DEFAULT_POOJA_CITY = "Delhi - NCR"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PoojaDetailScreen(
     isAdmin: Boolean,
     onBack: () -> Unit,
+    onBookTokenClick: (poojaId: String) -> Unit,
     viewModel: PoojaDetailViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
     var bookingToCancel by remember { mutableStateOf<PoojaBookingData?>(null) }
 
     LaunchedEffect(isAdmin) {
@@ -57,44 +66,6 @@ fun PoojaDetailScreen(
             confirmButton = {
                 TextButton(onClick = { viewModel.clearError() }) { Text("OK") }
             }
-        )
-    }
-
-    if (state.bookingSuccess != null) {
-        val booking = state.bookingSuccess!!
-        AlertDialog(
-            onDismissRequest = { viewModel.dismissBookingSuccess() },
-            title = { Text("Token Booked") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    booking.tokenNumber?.let { Text("Token: #$it") }
-                    Text("Name: ${booking.name}")
-                    Text("Phone: ${booking.phone}")
-                    Text("Members: ${booking.memberCount}")
-                    Text("City: ${booking.city}")
-                    Text("Status: ${booking.status.replaceFirstChar { it.uppercase() }}")
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { viewModel.dismissBookingSuccess() }) { Text("OK") }
-            }
-        )
-    }
-
-    if (state.showBookingDialog) {
-        BookingDialog(
-            name = state.bookingName,
-            phone = state.bookingPhone,
-            memberCount = state.bookingMemberCount,
-            city = state.bookingCity,
-            availableTokens = state.pooja?.availableTokens,
-            isLoading = state.bookingLoading,
-            onNameChange = { viewModel.updateBookingName(it) },
-            onPhoneChange = { viewModel.updateBookingPhone(it) },
-            onMemberCountChange = { viewModel.updateBookingMemberCount(it) },
-            onCityChange = { viewModel.updateBookingCity(it) },
-            onDismiss = { viewModel.closeBookingDialog() },
-            onConfirm = { viewModel.bookToken() }
         )
     }
 
@@ -143,6 +114,17 @@ fun PoojaDetailScreen(
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
+                },
+                actions = {
+                    val pooja = state.pooja
+                    val bookings = pooja?.bookings.orEmpty()
+                    if (isAdmin && pooja != null && bookings.isNotEmpty()) {
+                        TextButton(onClick = { exportPoojaBookings(context, pooja, bookings) }) {
+                            Icon(Icons.Filled.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Export")
+                        }
+                    }
                 }
             )
         }
@@ -189,8 +171,8 @@ fun PoojaDetailScreen(
                         if (!isAdmin) {
                             item {
                                 Button(
-                                    onClick = { viewModel.openBookingDialog() },
-                                    enabled = pooja.availableTokens > 0 && !state.bookingLoading,
+                                    onClick = { onBookTokenClick(pooja.id) },
+                                    enabled = pooja.availableTokens > 0,
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(48.dp)
@@ -407,109 +389,6 @@ private fun BookingRow(
     }
 }
 
-@Composable
-private fun BookingDialog(
-    name: String,
-    phone: String,
-    memberCount: String,
-    city: String,
-    availableTokens: Int?,
-    isLoading: Boolean,
-    onNameChange: (String) -> Unit,
-    onPhoneChange: (String) -> Unit,
-    onMemberCountChange: (String) -> Unit,
-    onCityChange: (String) -> Unit,
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit
-) {
-    var cityPrefillCleared by remember { mutableStateOf(false) }
-
-    AlertDialog(
-        onDismissRequest = { if (!isLoading) onDismiss() },
-        title = { Text("Book Token") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { raw ->
-                        val filtered = raw
-                            .filter { it.isLetter() || it.isWhitespace() }
-                            .take(50)
-                        onNameChange(filtered)
-                    },
-                    label = { Text("Name") },
-                    singleLine = true,
-                    enabled = !isLoading,
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Text,
-                        capitalization = KeyboardCapitalization.Words
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = phone,
-                    onValueChange = { if (it.length <= 15 && it.all { c -> c.isDigit() }) onPhoneChange(it) },
-                    label = { Text("Phone") },
-                    singleLine = true,
-                    enabled = !isLoading,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = memberCount,
-                    onValueChange = { raw ->
-                        val filtered = raw
-                            .filter { it.isDigit() }
-                            .take(2)
-                        onMemberCountChange(filtered)
-                    },
-                    label = { Text("Members") },
-                    supportingText = availableTokens?.let { { Text("Available tokens: $it") } },
-                    singleLine = true,
-                    enabled = !isLoading,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = city,
-                    onValueChange = { raw -> onCityChange(raw.take(100)) },
-                    label = { Text("City") },
-                    singleLine = true,
-                    enabled = !isLoading,
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Text,
-                        capitalization = KeyboardCapitalization.Words
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .onFocusChanged { focusState ->
-                            if (
-                                focusState.isFocused &&
-                                !cityPrefillCleared &&
-                                city == DEFAULT_POOJA_CITY
-                            ) {
-                                cityPrefillCleared = true
-                                onCityChange("")
-                            }
-                        }
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onConfirm, enabled = !isLoading) {
-                if (isLoading) {
-                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                } else {
-                    Text("Book")
-                }
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !isLoading) { Text("Cancel") }
-        }
-    )
-}
-
 private fun isFutureDateTime(isoString: String): Boolean {
     return try {
         Instant.parse(isoString).isAfter(Instant.now())
@@ -527,4 +406,195 @@ private fun formatDateTime(isoString: String): String {
     } catch (_: Exception) {
         isoString
     }
+}
+
+private fun exportPoojaBookings(
+    context: Context,
+    pooja: PoojaDetailData,
+    bookings: List<PoojaBookingData>
+) {
+    runCatching {
+        val pdfFile = createPoojaBookingsPdf(context, pooja, bookings)
+        val uri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            pdfFile
+        )
+        val title = "Pooja Token Bookings - ${pooja.place}"
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "application/pdf"
+            putExtra(Intent.EXTRA_SUBJECT, title)
+            putExtra(Intent.EXTRA_STREAM, uri)
+            clipData = ClipData.newUri(context.contentResolver, title, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(Intent.createChooser(intent, "Export Pooja Tokens"))
+    }.onFailure {
+        Toast.makeText(context, "Unable to export pooja tokens PDF", Toast.LENGTH_LONG).show()
+    }
+}
+
+private fun createPoojaBookingsPdf(
+    context: Context,
+    pooja: PoojaDetailData,
+    bookings: List<PoojaBookingData>
+): File {
+    val exportDir = File(context.cacheDir, "exports").apply { mkdirs() }
+    val pdfFile = File(exportDir, "pooja_tokens_${safeFilePart(pooja.place)}.pdf")
+
+    val document = PdfDocument()
+    val pageWidth = 595
+    val pageHeight = 842
+    val margin = 40f
+    val contentWidth = pageWidth - (margin * 2)
+    var pageNumber = 1
+    lateinit var page: PdfDocument.Page
+    lateinit var canvas: Canvas
+    var y = margin
+
+    val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.BLACK
+        textSize = 20f
+        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+    }
+    val sectionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.BLACK
+        textSize = 14f
+        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+    }
+    val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.rgb(40, 40, 40)
+        textSize = 11f
+    }
+    val mutedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.rgb(95, 95, 95)
+        textSize = 10f
+    }
+    val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.rgb(210, 210, 210)
+        strokeWidth = 1f
+    }
+
+    fun startPage() {
+        page = document.startPage(
+            PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create()
+        )
+        canvas = page.canvas
+        y = margin
+        pageNumber += 1
+    }
+
+    fun finishPage() {
+        document.finishPage(page)
+    }
+
+    fun ensureSpace(required: Float) {
+        if (y + required > pageHeight - margin) {
+            finishPage()
+            startPage()
+        }
+    }
+
+    fun drawWrapped(text: String, paint: Paint, extraBottom: Float = 4f) {
+        val lines = wrapText(text, paint, contentWidth)
+        lines.forEach { line ->
+            ensureSpace(paint.textSize + 8f)
+            canvas.drawText(line, margin, y, paint)
+            y += paint.textSize + 5f
+        }
+        y += extraBottom
+    }
+
+    fun drawSeparator() {
+        ensureSpace(12f)
+        canvas.drawLine(margin, y, pageWidth - margin, y, linePaint)
+        y += 12f
+    }
+
+    val sortedBookings = bookings.sortedWith(
+        compareBy<PoojaBookingData> { it.tokenNumber ?: Int.MAX_VALUE }
+            .thenBy { it.createdAt ?: "" }
+            .thenBy { it.name }
+    )
+    val confirmedCount = bookings.count { it.status == "confirmed" }
+    val cancelledCount = bookings.count { it.status == "cancelled" }
+
+    startPage()
+
+    drawWrapped("Pooja Token Bookings", titlePaint, extraBottom = 8f)
+    drawWrapped(pooja.place, sectionPaint)
+    drawWrapped("Scheduled: ${formatDateTime(pooja.scheduledAt)}", bodyPaint)
+    drawWrapped("Status: ${pooja.status.toTitleLabel()}", bodyPaint)
+    drawWrapped(
+        "Tokens: ${pooja.bookedTokens} booked / ${pooja.totalTokens} total (${pooja.availableTokens} available)",
+        bodyPaint
+    )
+    drawWrapped(
+        "Requests: ${bookings.size} total, $confirmedCount confirmed, $cancelledCount cancelled",
+        bodyPaint,
+        extraBottom = 8f
+    )
+
+    drawSeparator()
+    drawWrapped("Token List (${bookings.size} requests)", sectionPaint, extraBottom = 8f)
+
+    sortedBookings.forEachIndexed { index, booking ->
+        ensureSpace(112f)
+        drawWrapped(
+            "${index + 1}. ${booking.tokenNumber?.let { "Token #$it" } ?: "Token N/A"} - ${booking.name}",
+            sectionPaint
+        )
+        drawWrapped("Phone: ${booking.phone}", bodyPaint)
+        drawWrapped("Members: ${booking.memberCount}", bodyPaint)
+        drawWrapped("City: ${booking.city}", bodyPaint)
+        booking.user?.name?.takeIf { it.isNotBlank() && it != booking.name }?.let {
+            drawWrapped("User: $it", bodyPaint)
+        }
+        booking.user?.mobile?.takeIf { it.isNotBlank() && it != booking.phone }?.let {
+            drawWrapped("User mobile: $it", bodyPaint)
+        }
+        booking.createdAt?.let { drawWrapped("Booked: ${formatDateTime(it)}", mutedPaint) }
+        booking.cancelledAt?.let { drawWrapped("Cancelled: ${formatDateTime(it)}", mutedPaint) }
+        drawWrapped("Status: ${booking.status.toTitleLabel()}", mutedPaint, extraBottom = 6f)
+        drawSeparator()
+    }
+
+    finishPage()
+    FileOutputStream(pdfFile).use { output -> document.writeTo(output) }
+    document.close()
+    return pdfFile
+}
+
+private fun wrapText(text: String, paint: Paint, maxWidth: Float): List<String> {
+    if (paint.measureText(text) <= maxWidth) return listOf(text)
+
+    val lines = mutableListOf<String>()
+    var current = ""
+    text.split(" ").forEach { word ->
+        val candidate = if (current.isBlank()) word else "$current $word"
+        if (paint.measureText(candidate) <= maxWidth) {
+            current = candidate
+        } else {
+            if (current.isNotBlank()) lines.add(current)
+            current = word
+        }
+    }
+    if (current.isNotBlank()) lines.add(current)
+    return lines.ifEmpty { listOf(text) }
+}
+
+private fun safeFilePart(value: String): String {
+    return value
+        .replace(Regex("[^A-Za-z0-9_-]+"), "_")
+        .trim('_')
+        .ifBlank { "pooja" }
+        .take(40)
+}
+
+private fun String.toTitleLabel(): String {
+    return split('_', ' ')
+        .filter { it.isNotBlank() }
+        .joinToString(" ") { part ->
+            part.replaceFirstChar { char -> char.uppercase() }
+        }
 }

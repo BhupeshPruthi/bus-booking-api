@@ -1,17 +1,14 @@
 package com.mybus.app.ui.pooja
 
-import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mybus.app.data.local.TokenManager
-import com.mybus.app.data.remote.dto.PoojaBookingData
 import com.mybus.app.data.remote.dto.PoojaDetailData
 import com.mybus.app.data.repository.PoojaRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -20,19 +17,8 @@ data class PoojaDetailUiState(
     val error: String? = null,
     val isAdmin: Boolean = false,
     val pooja: PoojaDetailData? = null,
-
-    val showBookingDialog: Boolean = false,
-    val bookingName: String = "",
-    val bookingPhone: String = "",
-    val bookingMemberCount: String = "1",
-    val bookingCity: String = DEFAULT_POOJA_CITY,
-    val bookingLoading: Boolean = false,
-    val bookingSuccess: PoojaBookingData? = null,
     val cancelInProgressId: String? = null
 )
-
-private const val DEFAULT_POOJA_CITY = "Delhi - NCR"
-private const val MAX_POOJA_MEMBERS = 10
 
 @HiltViewModel
 class PoojaDetailViewModel @Inject constructor(
@@ -73,109 +59,8 @@ class PoojaDetailViewModel @Inject constructor(
         }
     }
 
-    fun openBookingDialog() {
-        viewModelScope.launch {
-            val defaultName = tokenManager.userName.firstOrNull()
-                .orEmpty()
-                .filter { it.isLetter() || it.isWhitespace() }
-            val defaultPhone = tokenManager.userMobile.firstOrNull()
-                .orEmpty()
-                .filter { it.isDigit() }
-
-            _uiState.value = _uiState.value.copy(
-                showBookingDialog = true,
-                bookingName = defaultName,
-                bookingPhone = defaultPhone,
-                bookingMemberCount = "1",
-                bookingCity = DEFAULT_POOJA_CITY,
-                bookingSuccess = null
-            )
-        }
-    }
-
-    fun closeBookingDialog() {
-        _uiState.value = _uiState.value.copy(showBookingDialog = false)
-    }
-
-    fun updateBookingName(value: String) {
-        _uiState.value = _uiState.value.copy(bookingName = value)
-    }
-
-    fun updateBookingPhone(value: String) {
-        _uiState.value = _uiState.value.copy(bookingPhone = value)
-    }
-
-    fun updateBookingMemberCount(value: String) {
-        val filtered = value
-            .filter { it.isDigit() }
-            .take(2)
-        _uiState.value = _uiState.value.copy(bookingMemberCount = filtered)
-    }
-
-    fun updateBookingCity(value: String) {
-        _uiState.value = _uiState.value.copy(bookingCity = value.take(100))
-    }
-
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
-    }
-
-    fun dismissBookingSuccess() {
-        _uiState.value = _uiState.value.copy(bookingSuccess = null)
-    }
-
-    fun bookToken() {
-        val state = _uiState.value
-        val name = state.bookingName.trim()
-        val phone = state.bookingPhone.trim()
-        val memberCount = state.bookingMemberCount.toIntOrNull()
-        val city = state.bookingCity.trim().ifBlank { DEFAULT_POOJA_CITY }
-
-        if (name.isBlank()) {
-            _uiState.value = state.copy(error = "Please enter your name")
-            return
-        }
-        if (!name.matches(Regex("^[\\p{L} ]+$"))) {
-            _uiState.value = state.copy(error = "Name should contain only letters")
-            return
-        }
-        if (!phone.matches(Regex("^[0-9]{10,15}$"))) {
-            _uiState.value = state.copy(error = "Please enter a valid phone number")
-            return
-        }
-        if (memberCount == null || memberCount !in 1..MAX_POOJA_MEMBERS) {
-            _uiState.value = state.copy(error = "Members must be between 1 and $MAX_POOJA_MEMBERS")
-            return
-        }
-        if (city.isBlank()) {
-            _uiState.value = state.copy(error = "Please enter your city")
-            return
-        }
-        viewModelScope.launch {
-            Log.d("PoojaUI", "Booking token poojaId=$poojaId name=$name phone=$phone members=$memberCount city=$city")
-            _uiState.value = _uiState.value.copy(bookingLoading = true, error = null)
-            poojaRepository.bookToken(poojaId, name, phone, memberCount, city)
-                .onSuccess { booking ->
-                    Log.d("PoojaUI", "Booking success id=${booking.id} status=${booking.status}")
-                    val existingName = tokenManager.userName.firstOrNull().orEmpty()
-                    if (existingName.isBlank() && name.isNotBlank()) {
-                        tokenManager.updateUserName(name)
-                    }
-                    _uiState.value = _uiState.value.copy(
-                        bookingLoading = false,
-                        showBookingDialog = false,
-                        bookingSuccess = booking
-                    )
-                    load(_uiState.value.isAdmin)
-                }
-                .onFailure { e ->
-                    Log.d("PoojaUI", "Booking failed error=${e.message}")
-                    _uiState.value = _uiState.value.copy(
-                        bookingLoading = false,
-                        error = e.message ?: "Failed to book token"
-                    )
-                }
-        }
     }
 
     fun cancelBookingAsAdmin(bookingId: String) {

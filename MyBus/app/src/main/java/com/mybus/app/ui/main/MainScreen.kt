@@ -29,6 +29,7 @@ import com.mybus.app.ui.home.HomeTab
 import com.mybus.app.ui.navigation.BottomTabs
 import com.mybus.app.ui.theme.BrandOrange
 import com.mybus.app.ui.theme.TabBarIndicatorGradientFill
+import com.mybus.app.ui.pooja.PoojaBookingScreen
 import com.mybus.app.ui.pooja.PoojaDetailScreen
 import com.mybus.app.ui.pooja.PoojaTab
 import com.mybus.app.ui.pooja.SchedulePoojaScreen
@@ -76,6 +77,7 @@ fun MainScreen(
             "bus_detail/{busId}",
             "admin_bus_detail/{busId}",
             "pooja_detail/{poojaId}",
+            "pooja_book/{poojaId}",
             "booking_detail/{bookingId}",
             "my_trips",
             "live_events_web",
@@ -196,6 +198,9 @@ fun MainScreen(
                     onAddClick = { tabNavController.navigate("schedule_pooja") },
                     onPoojaClick = { poojaId ->
                         tabNavController.navigate("pooja_detail/$poojaId")
+                    },
+                    onBookPoojaClick = { poojaId ->
+                        tabNavController.navigate("pooja_book/$poojaId")
                     }
                 )
             }
@@ -275,7 +280,23 @@ fun MainScreen(
             ) {
                 PoojaDetailScreen(
                     isAdmin = isAdmin,
-                    onBack = { tabNavController.popBackStack() }
+                    onBack = { tabNavController.popBackStack() },
+                    onBookTokenClick = { poojaId ->
+                        if (isLoggedIn) {
+                            tabNavController.navigate("pooja_book/$poojaId")
+                        } else {
+                            onRequireLogin()
+                        }
+                    }
+                )
+            }
+            composable(
+                route = "pooja_book/{poojaId}",
+                arguments = listOf(navArgument("poojaId") { type = NavType.StringType })
+            ) {
+                PoojaBookingScreen(
+                    onBack = { tabNavController.popBackStack() },
+                    onDone = { tabNavController.popBackStack() }
                 )
             }
             composable(

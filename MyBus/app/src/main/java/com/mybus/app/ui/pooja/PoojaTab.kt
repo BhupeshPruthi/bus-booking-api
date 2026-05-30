@@ -3,7 +3,6 @@ package com.mybus.app.ui.pooja
 import android.util.Log
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -16,15 +15,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -34,8 +27,6 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-private const val DEFAULT_POOJA_CITY = "Delhi - NCR"
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PoojaTab(
@@ -43,63 +34,14 @@ fun PoojaTab(
     isLoggedIn: Boolean,
     onRequireLogin: () -> Unit,
     onAddClick: () -> Unit,
-    onPoojaClick: (poojaId: String) -> Unit
+    onPoojaClick: (poojaId: String) -> Unit,
+    onBookPoojaClick: (poojaId: String) -> Unit
 ) {
     val listViewModel: PoojaListViewModel = hiltViewModel()
     val listState by listViewModel.uiState.collectAsState()
 
     LaunchedEffect(Unit) {
         listViewModel.loadPoojas()
-    }
-
-    if (listState.bookingSuccess != null) {
-        val booking = listState.bookingSuccess!!
-        AlertDialog(
-            onDismissRequest = { listViewModel.dismissBookingSuccess() },
-            title = { Text("Token Booked") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    booking.tokenNumber?.let { Text("Token: #$it") }
-                    Text("Name: ${booking.name}")
-                    Text("Phone: ${booking.phone}")
-                    Text("Members: ${booking.memberCount}")
-                    Text("City: ${booking.city}")
-                    Text("Status: ${booking.status.replaceFirstChar { it.uppercase() }}")
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { listViewModel.dismissBookingSuccess() }) { Text("OK") }
-            }
-        )
-    }
-
-    if (listState.showBookingDialog && listState.bookingPooja != null) {
-        QuickBookingDialog(
-            pooja = listState.bookingPooja!!,
-            name = listState.bookingName,
-            phone = listState.bookingPhone,
-            memberCount = listState.bookingMemberCount,
-            city = listState.bookingCity,
-            isLoading = listState.bookingLoading,
-            error = listState.bookingError,
-            onNameChange = { listViewModel.updateBookingName(it) },
-            onPhoneChange = { listViewModel.updateBookingPhone(it) },
-            onMemberCountChange = { listViewModel.updateBookingMemberCount(it) },
-            onCityChange = { listViewModel.updateBookingCity(it) },
-            onDismiss = { listViewModel.closeBookingDialog() },
-            onConfirm = { listViewModel.bookSelectedPoojaToken() }
-        )
-    }
-
-    if (listState.bookingError != null && !listState.showBookingDialog) {
-        AlertDialog(
-            onDismissRequest = { listViewModel.clearBookingError() },
-            title = { Text("Error") },
-            text = { Text(listState.bookingError!!) },
-            confirmButton = {
-                TextButton(onClick = { listViewModel.clearBookingError() }) { Text("OK") }
-            }
-        )
     }
 
     Scaffold(
@@ -185,7 +127,7 @@ fun PoojaTab(
                                         if (!isLoggedIn) {
                                             onRequireLogin()
                                         } else {
-                                            listViewModel.openBookingDialog(pooja)
+                                            onBookPoojaClick(pooja.id)
                                         }
                                     }
                                 } else null
@@ -295,132 +237,6 @@ private fun PoojaCard(
             }
         }
     }
-}
-
-@Composable
-private fun QuickBookingDialog(
-    pooja: PoojaListItem,
-    name: String,
-    phone: String,
-    memberCount: String,
-    city: String,
-    isLoading: Boolean,
-    error: String?,
-    onNameChange: (String) -> Unit,
-    onPhoneChange: (String) -> Unit,
-    onMemberCountChange: (String) -> Unit,
-    onCityChange: (String) -> Unit,
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit
-) {
-    var cityPrefillCleared by remember { mutableStateOf(false) }
-
-    AlertDialog(
-        onDismissRequest = { if (!isLoading) onDismiss() },
-        title = { Text("Book Pooja") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    text = "${pooja.place} • ${formatDateTime(pooja.scheduledAt)}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { raw ->
-                        val filtered = raw
-                            .filter { it.isLetter() || it.isWhitespace() }
-                            .take(50)
-                        onNameChange(filtered)
-                    },
-                    label = { Text("Name") },
-                    singleLine = true,
-                    enabled = !isLoading,
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Text,
-                        capitalization = KeyboardCapitalization.Words
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                OutlinedTextField(
-                    value = phone,
-                    onValueChange = { raw ->
-                        val filtered = raw
-                            .filter { it.isDigit() }
-                            .take(15)
-                        onPhoneChange(filtered)
-                    },
-                    label = { Text("Phone") },
-                    singleLine = true,
-                    enabled = !isLoading,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                OutlinedTextField(
-                    value = memberCount,
-                    onValueChange = { raw ->
-                        val filtered = raw
-                            .filter { it.isDigit() }
-                            .take(2)
-                        onMemberCountChange(filtered)
-                    },
-                    label = { Text("Members") },
-                    supportingText = { Text("Available tokens: ${pooja.availableTokens}") },
-                    singleLine = true,
-                    enabled = !isLoading,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                OutlinedTextField(
-                    value = city,
-                    onValueChange = { raw -> onCityChange(raw.take(100)) },
-                    label = { Text("City") },
-                    singleLine = true,
-                    enabled = !isLoading,
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Text,
-                        capitalization = KeyboardCapitalization.Words
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .onFocusChanged { focusState ->
-                            if (
-                                focusState.isFocused &&
-                                !cityPrefillCleared &&
-                                city == DEFAULT_POOJA_CITY
-                            ) {
-                                cityPrefillCleared = true
-                                onCityChange("")
-                            }
-                        }
-                )
-
-                error?.let {
-                    Text(
-                        text = it,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onConfirm, enabled = !isLoading) {
-                if (isLoading) {
-                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                } else {
-                    Text("Confirm")
-                }
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !isLoading) { Text("Cancel") }
-        }
-    )
 }
 
 private fun formatDateTime(isoString: String): String {
