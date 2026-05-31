@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalTime
-import java.time.ZoneId
+import java.time.ZoneOffset
 import javax.inject.Inject
 
 data class AddEventUiState(
@@ -75,10 +75,10 @@ class AddEventViewModel @Inject constructor(
             return
         }
 
-        // Treat event as an all-day date. Use end-of-day in local zone so "today" still works.
+        // Treat event as an all-day date. Use UTC so device timezone settings cannot change the selected date.
         val eventInstant = date
             .atTime(LocalTime.of(23, 59))
-            .atZone(ZoneId.systemDefault())
+            .atZone(ZoneOffset.UTC)
             .toInstant()
             .toString()
 

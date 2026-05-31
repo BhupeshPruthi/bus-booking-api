@@ -1,18 +1,38 @@
 const { db } = require('../config/database');
-const { NotFoundError } = require('../utils/errors');
+const { NotFoundError, ValidationError } = require('../utils/errors');
 const eventImageStorageService = require('./eventImageStorageService');
+
+function normalizeEventDate(value) {
+  const eventDate = new Date(value);
+  if (Number.isNaN(eventDate.getTime())) {
+    throw new ValidationError('Invalid event date', [
+      { field: 'eventDate', message: 'Event date must be a valid ISO date' },
+    ]);
+  }
+
+  const todayStartUtc = new Date();
+  todayStartUtc.setUTCHours(0, 0, 0, 0);
+  if (eventDate < todayStartUtc) {
+    throw new ValidationError('Event date must be today or a future date', [
+      { field: 'eventDate', message: 'Event date must be today or a future date' },
+    ]);
+  }
+
+  return eventDate;
+}
 
 class EventService {
   async createEvent(adminUserId, data, imageFile = null, options = {}) {
     let uploadedImage = null;
 
     try {
+      const eventDate = normalizeEventDate(data.eventDate);
       uploadedImage = await eventImageStorageService.uploadEventImage(imageFile);
 
       const eventData = {
         header: data.header,
         sub_header: data.subHeader,
-        event_at: data.eventDate,
+        event_at: eventDate,
         status: 'scheduled',
         created_by: adminUserId,
       };

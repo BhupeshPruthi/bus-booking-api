@@ -157,3 +157,22 @@ test('createEvent can return proxied event image URL for private bucket images',
   assert.equal(fixture.events[0].image_url, 'https://cdn.example.com/events/test.jpg');
   assert.equal(event.imageUrl, 'https://api.example.com/api/events/images/test.jpg');
 });
+
+test('createEvent rejects past calendar dates', async () => {
+  const fixture = { events: [] };
+  const eventService = loadEventServiceWithFixture(fixture);
+  const yesterday = new Date();
+  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+  yesterday.setUTCHours(23, 59, 0, 0);
+
+  await assert.rejects(
+    () => eventService.createEvent('admin-1', {
+      header: 'Old event',
+      subHeader: 'Past event',
+      eventDate: yesterday.toISOString(),
+    }),
+    /Event date must be today or a future date/
+  );
+
+  assert.equal(fixture.events.length, 0);
+});

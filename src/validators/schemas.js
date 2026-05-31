@@ -188,7 +188,7 @@ const adminCancelPoojaBookingSchema = Joi.object({});
 const createEventSchema = Joi.object({
   header: Joi.string().max(200).required().trim(),
   subHeader: Joi.string().max(500).required().trim(),
-  eventDate: Joi.date().iso().greater('now').required(),
+  eventDate: Joi.date().iso().required(),
 });
 
 // ============ PAYMENT SCHEMAS ============

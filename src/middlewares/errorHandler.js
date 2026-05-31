@@ -16,6 +16,7 @@ const errorHandler = (err, req, res, next) => {
     path: req.path,
     method: req.method,
     ip: req.ip,
+    details: err.details,
   });
 
   // Send response
