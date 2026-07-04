@@ -2,6 +2,14 @@ const { db } = require('../config/database');
 const { NotFoundError, ValidationError, ConflictError } = require('../utils/errors');
 
 const DEFAULT_POOJA_CITY = 'Delhi - NCR';
+const POOJA_ACTIVE_WINDOW_HOURS = 8;
+const POOJA_ACTIVE_WINDOW_MS = POOJA_ACTIVE_WINDOW_HOURS * 60 * 60 * 1000;
+const BOOKING_STATUS = {
+  NOT_STARTED: 'not_started',
+  OPEN: 'open',
+  FULL: 'full',
+  EXPIRED: 'expired',
+};
 
 class PoojaService {
   // ============ ADMIN ============
@@ -50,9 +58,10 @@ class PoojaService {
 
   async getUpcomingPoojas() {
     const now = new Date();
+    const expiryCutoff = new Date(now.getTime() - POOJA_ACTIVE_WINDOW_MS);
     const poojas = await db('poojas')
       .where('status', 'scheduled')
-      .andWhere('scheduled_at', '>', now)
+      .andWhere('scheduled_at', '>', expiryCutoff)
       .orderBy('scheduled_at', 'asc');
 
     const ids = poojas.map((p) => p.id);
@@ -91,8 +100,12 @@ class PoojaService {
         throw new ValidationError('This pooja is not available for booking');
       }
 
-      if (new Date(pooja.scheduled_at) <= new Date()) {
-        throw new ValidationError('Cannot book a pooja that has already started');
+      const bookingWindow = this.getBookingWindow(pooja, 0);
+      if (bookingWindow.bookingStatus === BOOKING_STATUS.NOT_STARTED) {
+        throw new ValidationError('Pooja booking has not started yet');
+      }
+      if (bookingWindow.bookingStatus === BOOKING_STATUS.EXPIRED) {
+        throw new ValidationError('Cannot book a pooja after it has expired');
       }
 
       const countRow = await trx('pooja_bookings')
@@ -101,6 +114,23 @@ class PoojaService {
         .count('id as count')
         .first();
       const bookedTokens = parseInt(countRow?.count || 0, 10);
+      const currentBookingWindow = this.getBookingWindow(pooja, bookedTokens);
+      if (currentBookingWindow.bookingStatus === BOOKING_STATUS.NOT_STARTED) {
+        throw new ValidationError('Pooja booking has not started yet');
+      }
+      if (currentBookingWindow.bookingStatus === BOOKING_STATUS.EXPIRED) {
+        throw new ValidationError('Cannot book a pooja after it has expired');
+      }
+
+      const existingUserBooking = await trx('pooja_bookings')
+        .where('pooja_id', poojaId)
+        .where('user_id', userId)
+        .where('status', 'confirmed')
+        .first();
+
+      if (existingUserBooking) {
+        throw new ConflictError('You already have a token for this pooja');
+      }
 
       if (bookedTokens + 1 > pooja.total_tokens) {
         throw new ConflictError('No tokens available for this pooja');
@@ -126,18 +156,27 @@ class PoojaService {
         throw new ConflictError('No tokens available for this pooja');
       }
 
-      const [booking] = await trx('pooja_bookings')
-        .insert({
-          pooja_id: poojaId,
-          user_id: userId,
-          name: data.name,
-          phone: data.phone,
-          member_count: memberCount,
-          city,
-          token_number: tokenNumber,
-          status: 'confirmed',
-        })
-        .returning('*');
+      let booking;
+      try {
+        [booking] = await trx('pooja_bookings')
+          .insert({
+            pooja_id: poojaId,
+            user_id: userId,
+            name: data.name,
+            phone: data.phone,
+            member_count: memberCount,
+            city,
+            token_number: tokenNumber,
+            status: 'confirmed',
+          })
+          .returning('*');
+      } catch (error) {
+        const uniqueTarget = String(error?.constraint || error?.message || '');
+        if (error?.code === '23505' && uniqueTarget.includes('pooja_bookings_confirmed_user_unique')) {
+          throw new ConflictError('You already have a token for this pooja');
+        }
+        throw error;
+      }
 
       return this.formatBooking(booking);
     });
@@ -152,8 +191,8 @@ class PoojaService {
 
       if (!pooja) throw new NotFoundError('Pooja');
 
-      if (new Date(pooja.scheduled_at) <= new Date()) {
-        throw new ValidationError('Cannot cancel a token after the pooja has started');
+      if (this.isPoojaExpired(pooja.scheduled_at)) {
+        throw new ValidationError('Cannot cancel a token after the pooja has expired');
       }
 
       const booking = await trx('pooja_bookings')
@@ -184,6 +223,46 @@ class PoojaService {
 
   // ============ HELPERS ============
 
+  getBookingWindow(pooja, bookedTokens, now = new Date()) {
+    const scheduledTime = new Date(pooja.scheduled_at).getTime();
+    const totalTokens = pooja.total_tokens;
+    const availableTokens = Math.max(0, totalTokens - bookedTokens);
+
+    if (Number.isNaN(scheduledTime)) {
+      return {
+        bookingStatus: BOOKING_STATUS.EXPIRED,
+        bookingOpensAt: pooja.scheduled_at,
+        bookingClosesAt: pooja.scheduled_at,
+        canBook: false,
+      };
+    }
+
+    const bookingClosesAt = new Date(scheduledTime + POOJA_ACTIVE_WINDOW_MS);
+    const nowTime = now.getTime();
+    let bookingStatus = BOOKING_STATUS.OPEN;
+
+    if (nowTime < scheduledTime) {
+      bookingStatus = BOOKING_STATUS.NOT_STARTED;
+    } else if (nowTime >= bookingClosesAt.getTime()) {
+      bookingStatus = BOOKING_STATUS.EXPIRED;
+    } else if (availableTokens <= 0) {
+      bookingStatus = BOOKING_STATUS.FULL;
+    }
+
+    return {
+      bookingStatus,
+      bookingOpensAt: pooja.scheduled_at,
+      bookingClosesAt,
+      canBook: bookingStatus === BOOKING_STATUS.OPEN,
+    };
+  }
+
+  isPoojaExpired(scheduledAt, now = new Date()) {
+    const scheduledTime = new Date(scheduledAt).getTime();
+    if (Number.isNaN(scheduledTime)) return true;
+    return scheduledTime + POOJA_ACTIVE_WINDOW_MS <= now.getTime();
+  }
+
   async getBookedTokensCount(poojaId) {
     const row = await db('pooja_bookings')
       .where('pooja_id', poojaId)
@@ -212,6 +291,7 @@ class PoojaService {
   formatPooja(pooja, bookedTokens) {
     const totalTokens = pooja.total_tokens;
     const availableTokens = Math.max(0, totalTokens - bookedTokens);
+    const bookingWindow = this.getBookingWindow(pooja, bookedTokens);
 
     return {
       id: pooja.id,
@@ -222,6 +302,10 @@ class PoojaService {
       availableTokens,
       status: pooja.status,
       createdAt: pooja.created_at,
+      bookingStatus: bookingWindow.bookingStatus,
+      bookingOpensAt: bookingWindow.bookingOpensAt,
+      bookingClosesAt: bookingWindow.bookingClosesAt,
+      canBook: bookingWindow.canBook,
     };
   }
 

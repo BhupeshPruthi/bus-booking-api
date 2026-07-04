@@ -27,6 +27,10 @@ data class PoojaListItem(
     @Json(name = "bookedTokens") val bookedTokens: Int,
     @Json(name = "availableTokens") val availableTokens: Int,
     @Json(name = "status") val status: String,
+    @Json(name = "bookingStatus") val bookingStatus: String? = null,
+    @Json(name = "bookingOpensAt") val bookingOpensAt: String? = null,
+    @Json(name = "bookingClosesAt") val bookingClosesAt: String? = null,
+    @Json(name = "canBook") val canBook: Boolean? = null,
     @Json(name = "createdAt") val createdAt: String? = null
 )
 
@@ -61,6 +65,10 @@ data class PoojaDetailData(
     @Json(name = "bookedTokens") val bookedTokens: Int,
     @Json(name = "availableTokens") val availableTokens: Int,
     @Json(name = "status") val status: String,
+    @Json(name = "bookingStatus") val bookingStatus: String? = null,
+    @Json(name = "bookingOpensAt") val bookingOpensAt: String? = null,
+    @Json(name = "bookingClosesAt") val bookingClosesAt: String? = null,
+    @Json(name = "canBook") val canBook: Boolean? = null,
     @Json(name = "createdAt") val createdAt: String? = null,
     @Json(name = "bookings") val bookings: List<PoojaBookingData>? = null
 )

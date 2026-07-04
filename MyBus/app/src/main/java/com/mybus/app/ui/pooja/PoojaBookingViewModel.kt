@@ -139,6 +139,26 @@ class PoojaBookingViewModel @Inject constructor(
             _uiState.value = state.copy(error = "Pooja details are still loading")
             return
         }
+        val bookingStatus = poojaBookingStatus(
+            scheduledAt = pooja.scheduledAt,
+            availableTokens = pooja.availableTokens,
+            serverStatus = pooja.bookingStatus
+        )
+        val canBook = canBookPooja(
+            scheduledAt = pooja.scheduledAt,
+            availableTokens = pooja.availableTokens,
+            serverCanBook = pooja.canBook,
+            serverStatus = pooja.bookingStatus
+        )
+        if (!canBook) {
+            val message = when (bookingStatus) {
+                POOJA_BOOKING_NOT_STARTED -> "Pooja booking has not started yet"
+                POOJA_BOOKING_FULL -> "No tokens available for this pooja"
+                else -> "This pooja has expired"
+            }
+            _uiState.value = state.copy(error = message)
+            return
+        }
         if (pooja.availableTokens <= 0) {
             _uiState.value = state.copy(error = "No tokens available for this pooja")
             return

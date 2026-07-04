@@ -225,13 +225,30 @@ private fun PoojaCard(
 
             if (showScheduleButton) {
                 Spacer(Modifier.height(12.dp))
-                val canSchedule = pooja.availableTokens > 0
+                val bookingStatus = poojaBookingStatus(
+                    scheduledAt = pooja.scheduledAt,
+                    availableTokens = pooja.availableTokens,
+                    serverStatus = pooja.bookingStatus
+                )
+                val canSchedule = canBookPooja(
+                    scheduledAt = pooja.scheduledAt,
+                    availableTokens = pooja.availableTokens,
+                    serverCanBook = pooja.canBook,
+                    serverStatus = pooja.bookingStatus
+                )
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     OutlinedButton(
                         onClick = { onScheduleClick?.invoke() },
                         enabled = canSchedule && onScheduleClick != null
                     ) {
-                        Text(if (canSchedule) "Book" else "Full")
+                        Text(
+                            when (bookingStatus) {
+                                POOJA_BOOKING_OPEN -> "Book"
+                                POOJA_BOOKING_NOT_STARTED -> "Not Started"
+                                POOJA_BOOKING_FULL -> "Full"
+                                else -> "Expired"
+                            }
+                        )
                     }
                 }
             }

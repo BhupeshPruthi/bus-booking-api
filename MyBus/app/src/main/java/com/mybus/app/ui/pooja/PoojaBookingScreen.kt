@@ -131,6 +131,17 @@ private fun BookingFormPage(
     modifier: Modifier = Modifier
 ) {
     val pooja = state.pooja ?: return
+    val canBook = canBookPooja(
+        scheduledAt = pooja.scheduledAt,
+        availableTokens = pooja.availableTokens,
+        serverCanBook = pooja.canBook,
+        serverStatus = pooja.bookingStatus
+    )
+    val bookingStatus = poojaBookingStatus(
+        scheduledAt = pooja.scheduledAt,
+        availableTokens = pooja.availableTokens,
+        serverStatus = pooja.bookingStatus
+    )
     var cityPrefillCleared by remember { mutableStateOf(false) }
 
     LazyColumn(
@@ -239,7 +250,7 @@ private fun BookingFormPage(
         item {
             Button(
                 onClick = onSubmit,
-                enabled = !state.isBooking && pooja.availableTokens > 0,
+                enabled = !state.isBooking && canBook,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp)
@@ -252,7 +263,11 @@ private fun BookingFormPage(
                         color = MaterialTheme.colorScheme.onPrimary
                     )
                 } else {
-                    Text(if (pooja.availableTokens > 0) "Book Token" else "No Tokens Available")
+                    Text(
+                        text = bookingButtonText(bookingStatus, pooja.bookingOpensAt ?: pooja.scheduledAt),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
         }
@@ -437,5 +452,14 @@ private fun formatDateTime(isoString: String): String {
         zoned.format(formatter)
     } catch (_: Exception) {
         isoString
+    }
+}
+
+private fun bookingButtonText(bookingStatus: String, bookingOpensAt: String): String {
+    return when (bookingStatus) {
+        POOJA_BOOKING_NOT_STARTED -> "Booking Opens at ${formatDateTime(bookingOpensAt)}"
+        POOJA_BOOKING_OPEN -> "Book Token"
+        POOJA_BOOKING_FULL -> "No Tokens Available"
+        else -> "Pooja Expired"
     }
 }

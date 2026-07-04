@@ -1,7 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const migration = require('../src/db/migrations/20260530000024_add_pooja_booking_member_tokens');
+const memberTokenMigration = require('../src/db/migrations/20260530000024_add_pooja_booking_member_tokens');
+const userUniqueMigration = require('../src/db/migrations/20260704000026_add_pooja_booking_user_unique');
 
 test('pooja booking migration adds member fields and backfills per-pooja token numbers', async () => {
   const statements = [];
@@ -12,7 +13,7 @@ test('pooja booking migration adds member fields and backfills per-pooja token n
     },
   };
 
-  await migration.up(knex);
+  await memberTokenMigration.up(knex);
 
   const joined = statements.join(' ');
   assert.match(joined, /ADD COLUMN IF NOT EXISTS member_count integer NOT NULL DEFAULT 1/);
@@ -25,4 +26,24 @@ test('pooja booking migration adds member fields and backfills per-pooja token n
   assert.match(joined, /ROW_NUMBER\(\) OVER \(PARTITION BY pb\.pooja_id ORDER BY pb\.created_at, pb\.id\)/);
   assert.match(joined, /CREATE UNIQUE INDEX IF NOT EXISTS pooja_bookings_confirmed_token_number_unique/);
   assert.match(joined, /ON pooja_bookings \(pooja_id, token_number\) WHERE status = 'confirmed'/);
+});
+
+test('pooja booking user unique migration cancels duplicate confirmed user tokens before adding index', async () => {
+  const statements = [];
+  const knex = {
+    raw(sql) {
+      statements.push(sql.replace(/\s+/g, ' ').trim());
+      return Promise.resolve();
+    },
+  };
+
+  await userUniqueMigration.up(knex);
+
+  const joined = statements.join(' ');
+  assert.match(joined, /ROW_NUMBER\(\) OVER \( PARTITION BY pooja_id, user_id ORDER BY created_at, id \) AS row_number/);
+  assert.match(joined, /WHERE status = 'confirmed'/);
+  assert.match(joined, /SET status = 'cancelled'/);
+  assert.match(joined, /cancelled_at = COALESCE\(cancelled_at, NOW\(\)\)/);
+  assert.match(joined, /CREATE UNIQUE INDEX IF NOT EXISTS pooja_bookings_confirmed_user_unique/);
+  assert.match(joined, /ON pooja_bookings \(pooja_id, user_id\) WHERE status = 'confirmed'/);
 });

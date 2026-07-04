@@ -160,6 +160,18 @@ fun PoojaDetailScreen(
 
                 else -> {
                     val pooja = state.pooja!!
+                    val bookingStatus = poojaBookingStatus(
+                        scheduledAt = pooja.scheduledAt,
+                        availableTokens = pooja.availableTokens,
+                        serverStatus = pooja.bookingStatus
+                    )
+                    val canBook = canBookPooja(
+                        scheduledAt = pooja.scheduledAt,
+                        availableTokens = pooja.availableTokens,
+                        serverCanBook = pooja.canBook,
+                        serverStatus = pooja.bookingStatus
+                    )
+                    val canCancelTokens = bookingStatus != POOJA_BOOKING_EXPIRED
                     LazyColumn(
                         contentPadding = PaddingValues(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -172,13 +184,16 @@ fun PoojaDetailScreen(
                             item {
                                 Button(
                                     onClick = { onBookTokenClick(pooja.id) },
-                                    enabled = pooja.availableTokens > 0,
+                                    enabled = canBook,
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(48.dp)
                                 ) {
                                     Text(
-                                        text = if (pooja.availableTokens > 0) "Book Token" else "No Tokens Available",
+                                        text = bookingButtonText(
+                                            bookingStatus,
+                                            pooja.bookingOpensAt ?: pooja.scheduledAt
+                                        ),
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -203,7 +218,6 @@ fun PoojaDetailScreen(
                                     )
                                 }
                             } else {
-                                val canCancelTokens = isFutureDateTime(pooja.scheduledAt)
                                 items(bookings, key = { it.id }) { booking ->
                                     BookingRow(
                                         booking = booking,
@@ -389,14 +403,6 @@ private fun BookingRow(
     }
 }
 
-private fun isFutureDateTime(isoString: String): Boolean {
-    return try {
-        Instant.parse(isoString).isAfter(Instant.now())
-    } catch (_: Exception) {
-        false
-    }
-}
-
 private fun formatDateTime(isoString: String): String {
     return try {
         val instant = Instant.parse(isoString)
@@ -405,6 +411,15 @@ private fun formatDateTime(isoString: String): String {
         zoned.format(formatter)
     } catch (_: Exception) {
         isoString
+    }
+}
+
+private fun bookingButtonText(bookingStatus: String, bookingOpensAt: String): String {
+    return when (bookingStatus) {
+        POOJA_BOOKING_NOT_STARTED -> "Booking Opens at ${formatDateTime(bookingOpensAt)}"
+        POOJA_BOOKING_OPEN -> "Book Token"
+        POOJA_BOOKING_FULL -> "No Tokens Available"
+        else -> "Pooja Expired"
     }
 }
 

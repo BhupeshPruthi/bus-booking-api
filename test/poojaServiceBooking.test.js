@@ -14,18 +14,59 @@ function makeQuery(table, fixture) {
   let returningColumn = null;
   let firstOnly = false;
   let aggregate = null;
+  let groupByColumn = null;
+  let orderByColumn = null;
+  let orderByDirection = 'asc';
 
   function rowsForTable() {
     return fixture[table];
   }
 
   function matches(row) {
-    return conditions.every((condition) => row[condition.column] === condition.value);
+    return conditions.every((condition) => {
+      const actual = row[condition.column];
+      switch (condition.operator) {
+        case '>':
+          return new Date(actual).getTime() > new Date(condition.value).getTime();
+        case 'in':
+          return condition.value.includes(actual);
+        case '=':
+        default:
+          return actual === condition.value;
+      }
+    });
   }
 
   const query = {
-    where(column, value) {
-      conditions.push({ column, value });
+    select() {
+      return query;
+    },
+    leftJoin() {
+      return query;
+    },
+    where(column, operatorOrValue, maybeValue) {
+      const hasOperator = maybeValue !== undefined;
+      conditions.push({
+        column,
+        operator: hasOperator ? operatorOrValue : '=',
+        value: hasOperator ? maybeValue : operatorOrValue,
+      });
+      return query;
+    },
+    andWhere(column, operatorOrValue, maybeValue) {
+      return query.where(column, operatorOrValue, maybeValue);
+    },
+    whereIn(column, values) {
+      conditions.push({ column, operator: 'in', value: values });
+      return query;
+    },
+    groupBy(column) {
+      groupByColumn = column;
+      return query;
+    },
+    orderBy(column, direction = 'asc') {
+      orderByColumn = column;
+      orderByDirection = direction;
       return query;
     },
     forUpdate() {
@@ -66,6 +107,9 @@ function makeQuery(table, fixture) {
       const matchingRows = rows.filter(matches);
 
       if (operation === 'insert') {
+        const insertError = fixture.__insertErrors?.[table];
+        if (insertError) throw insertError;
+
         const row = {
           id: `booking-${rows.length + 1}`,
           created_at: new Date().toISOString(),
@@ -85,6 +129,23 @@ function makeQuery(table, fixture) {
 
       if (aggregate) {
         const [column, alias] = aggregate.expression.split(/\s+as\s+/i);
+        if (groupByColumn) {
+          const grouped = new Map();
+          matchingRows.forEach((row) => {
+            const key = row[groupByColumn];
+            if (!grouped.has(key)) grouped.set(key, []);
+            grouped.get(key).push(row);
+          });
+          return Array.from(grouped.entries()).map(([key, rowsForGroup]) => ({
+            [groupByColumn]: key,
+            [alias]: aggregate.type === 'count'
+              ? rowsForGroup.filter((row) => row[column] != null).length
+              : rowsForGroup
+                .map((row) => parseInt(row[column], 10))
+                .filter((value) => Number.isFinite(value))
+                .reduce((total, value) => total + value, 0),
+          }));
+        }
         if (aggregate.type === 'count') {
           return { [alias]: matchingRows.filter((row) => row[column] != null).length };
         }
@@ -97,7 +158,17 @@ function makeQuery(table, fixture) {
         return { [alias]: result };
       }
 
-      return firstOnly ? matchingRows[0] : matchingRows;
+      const selectedRows = [...matchingRows];
+      if (orderByColumn) {
+        selectedRows.sort((a, b) => {
+          const left = a[orderByColumn];
+          const right = b[orderByColumn];
+          if (left === right) return 0;
+          const result = left > right ? 1 : -1;
+          return orderByDirection === 'desc' ? -result : result;
+        });
+      }
+      return firstOnly ? selectedRows[0] : selectedRows;
     },
     then(resolve, reject) {
       return Promise.resolve()
@@ -131,18 +202,78 @@ function loadPoojaServiceWithFixture(fixture) {
   return require(poojaServicePath);
 }
 
+function hoursFromNow(hours) {
+  return new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
+}
+
+test('getUpcomingPoojas keeps poojas visible until eight hours after start', async () => {
+  const fixture = {
+    poojas: [
+      {
+        id: 'expired',
+        scheduled_at: hoursFromNow(-9),
+        total_tokens: 10,
+        status: 'scheduled',
+      },
+      {
+        id: 'active-after-start',
+        scheduled_at: hoursFromNow(-2),
+        total_tokens: 10,
+        status: 'scheduled',
+      },
+      {
+        id: 'future',
+        scheduled_at: hoursFromNow(2),
+        total_tokens: 10,
+        status: 'scheduled',
+      },
+      {
+        id: 'cancelled',
+        scheduled_at: hoursFromNow(2),
+        total_tokens: 10,
+        status: 'cancelled',
+      },
+    ],
+    pooja_bookings: [
+      { id: 'booking-1', pooja_id: 'active-after-start', status: 'confirmed', token_number: 1 },
+      { id: 'booking-2', pooja_id: 'future', status: 'confirmed', token_number: 1 },
+    ],
+  };
+  const poojaService = loadPoojaServiceWithFixture(fixture);
+
+  const poojas = await poojaService.getUpcomingPoojas();
+
+  assert.deepEqual(poojas.map((pooja) => pooja.id), ['active-after-start', 'future']);
+  const activePooja = poojas.find((pooja) => pooja.id === 'active-after-start');
+  const futurePooja = poojas.find((pooja) => pooja.id === 'future');
+  assert.equal(activePooja.bookedTokens, 1);
+  assert.equal(activePooja.bookingStatus, 'open');
+  assert.equal(activePooja.canBook, true);
+  assert.equal(futurePooja.bookingStatus, 'not_started');
+  assert.equal(futurePooja.canBook, false);
+  assert.equal(futurePooja.bookingOpensAt, fixture.poojas[2].scheduled_at);
+  assert.ok(futurePooja.bookingClosesAt);
+});
+
 test('bookToken consumes one token per booking request and keeps member count as metadata', async () => {
   const fixture = {
     poojas: [
       {
         id: 'pooja-1',
-        scheduled_at: '2099-01-01T10:00:00.000Z',
+        scheduled_at: hoursFromNow(-1),
         total_tokens: 2,
         status: 'scheduled',
       },
     ],
     pooja_bookings: [
-      { id: 'existing', pooja_id: 'pooja-1', status: 'confirmed', member_count: 3, token_number: 1 },
+      {
+        id: 'existing',
+        pooja_id: 'pooja-1',
+        user_id: 'other-user',
+        status: 'confirmed',
+        member_count: 3,
+        token_number: 1,
+      },
     ],
   };
   const poojaService = loadPoojaServiceWithFixture(fixture);
@@ -160,12 +291,111 @@ test('bookToken consumes one token per booking request and keeps member count as
   assert.equal(await poojaService.getBookedTokensCount('pooja-1'), 2);
 });
 
+test('bookToken rejects requests before the pooja scheduled time', async () => {
+  const fixture = {
+    poojas: [
+      {
+        id: 'pooja-1',
+        scheduled_at: hoursFromNow(2),
+        total_tokens: 2,
+        status: 'scheduled',
+      },
+    ],
+    pooja_bookings: [],
+  };
+  const poojaService = loadPoojaServiceWithFixture(fixture);
+
+  await assert.rejects(
+    () => poojaService.bookToken('pooja-1', 'user-1', {
+      name: 'Asha',
+      phone: '9999999999',
+      memberCount: 1,
+      city: 'Delhi',
+    }),
+    /Pooja booking has not started yet/
+  );
+});
+
+test('bookToken allows requests at the pooja scheduled time', async () => {
+  const fixture = {
+    poojas: [
+      {
+        id: 'pooja-1',
+        scheduled_at: new Date().toISOString(),
+        total_tokens: 2,
+        status: 'scheduled',
+      },
+    ],
+    pooja_bookings: [],
+  };
+  const poojaService = loadPoojaServiceWithFixture(fixture);
+
+  const booking = await poojaService.bookToken('pooja-1', 'user-1', {
+    name: 'Asha',
+    phone: '9999999999',
+    memberCount: 1,
+    city: 'Delhi',
+  });
+
+  assert.equal(booking.status, 'confirmed');
+});
+
+test('bookToken allows booking after start until the eight-hour window expires', async () => {
+  const fixture = {
+    poojas: [
+      {
+        id: 'pooja-1',
+        scheduled_at: hoursFromNow(-2),
+        total_tokens: 2,
+        status: 'scheduled',
+      },
+    ],
+    pooja_bookings: [],
+  };
+  const poojaService = loadPoojaServiceWithFixture(fixture);
+
+  const booking = await poojaService.bookToken('pooja-1', 'user-1', {
+    name: 'Asha',
+    phone: '9999999999',
+    memberCount: 1,
+    city: 'Delhi',
+  });
+
+  assert.equal(booking.status, 'confirmed');
+  assert.equal(booking.tokenNumber, 1);
+});
+
+test('bookToken rejects booking after the eight-hour pooja window expires', async () => {
+  const fixture = {
+    poojas: [
+      {
+        id: 'pooja-1',
+        scheduled_at: hoursFromNow(-9),
+        total_tokens: 2,
+        status: 'scheduled',
+      },
+    ],
+    pooja_bookings: [],
+  };
+  const poojaService = loadPoojaServiceWithFixture(fixture);
+
+  await assert.rejects(
+    () => poojaService.bookToken('pooja-1', 'user-1', {
+      name: 'Asha',
+      phone: '9999999999',
+      memberCount: 1,
+      city: 'Delhi',
+    }),
+    /Cannot book a pooja after it has expired/
+  );
+});
+
 test('bookToken rejects only when confirmed booking count reaches capacity', async () => {
   const fixture = {
     poojas: [
       {
         id: 'pooja-1',
-        scheduled_at: '2099-01-01T10:00:00.000Z',
+        scheduled_at: hoursFromNow(-1),
         total_tokens: 1,
         status: 'scheduled',
       },
@@ -185,15 +415,95 @@ test('bookToken rejects only when confirmed booking count reaches capacity', asy
     }),
     /No tokens available/
   );
+
+  const pooja = await poojaService.getPoojaById('pooja-1');
+  assert.equal(pooja.bookingStatus, 'full');
+  assert.equal(pooja.canBook, false);
 });
 
-test('bookToken allows duplicate users and increments token numbers', async () => {
+test('bookToken rejects when the same user already has a confirmed token for the pooja', async () => {
   const fixture = {
     poojas: [
       {
         id: 'pooja-1',
-        scheduled_at: '2099-01-01T10:00:00.000Z',
+        scheduled_at: hoursFromNow(-1),
         total_tokens: 10,
+        status: 'scheduled',
+      },
+    ],
+    pooja_bookings: [
+      {
+        id: 'existing',
+        pooja_id: 'pooja-1',
+        user_id: 'same-user',
+        status: 'confirmed',
+        member_count: 1,
+        token_number: 1,
+      },
+    ],
+  };
+  const poojaService = loadPoojaServiceWithFixture(fixture);
+
+  await assert.rejects(
+    () => poojaService.bookToken('pooja-1', 'same-user', {
+      name: 'Asha',
+      phone: '9999999999',
+      memberCount: 1,
+      city: 'Delhi',
+    }),
+    /already have a token/
+  );
+
+  assert.equal(fixture.pooja_bookings.length, 1);
+});
+
+test('bookToken allows the same user after their previous token is cancelled', async () => {
+  const fixture = {
+    poojas: [
+      {
+        id: 'pooja-1',
+        scheduled_at: hoursFromNow(-1),
+        total_tokens: 2,
+        status: 'scheduled',
+      },
+    ],
+    pooja_bookings: [
+      {
+        id: 'cancelled-1',
+        pooja_id: 'pooja-1',
+        user_id: 'same-user',
+        status: 'cancelled',
+        member_count: 1,
+        token_number: 1,
+      },
+    ],
+  };
+  const poojaService = loadPoojaServiceWithFixture(fixture);
+
+  const booking = await poojaService.bookToken('pooja-1', 'same-user', {
+    name: 'Asha',
+    phone: '9999999999',
+    memberCount: 1,
+    city: 'Delhi',
+  });
+
+  assert.equal(booking.status, 'confirmed');
+  assert.equal(booking.tokenNumber, 1);
+});
+
+test('bookToken maps confirmed user unique index conflicts to duplicate-token errors', async () => {
+  const fixture = {
+    __insertErrors: {
+      pooja_bookings: {
+        code: '23505',
+        constraint: 'pooja_bookings_confirmed_user_unique',
+      },
+    },
+    poojas: [
+      {
+        id: 'pooja-1',
+        scheduled_at: hoursFromNow(-1),
+        total_tokens: 2,
         status: 'scheduled',
       },
     ],
@@ -201,21 +511,17 @@ test('bookToken allows duplicate users and increments token numbers', async () =
   };
   const poojaService = loadPoojaServiceWithFixture(fixture);
 
-  const first = await poojaService.bookToken('pooja-1', 'same-user', {
-    name: 'Asha',
-    phone: '9999999999',
-    memberCount: 1,
-    city: 'Delhi',
-  });
-  const second = await poojaService.bookToken('pooja-1', 'same-user', {
-    name: 'Asha',
-    phone: '9999999999',
-    memberCount: 1,
-    city: 'Delhi',
-  });
+  await assert.rejects(
+    () => poojaService.bookToken('pooja-1', 'same-user', {
+      name: 'Asha',
+      phone: '9999999999',
+      memberCount: 1,
+      city: 'Delhi',
+    }),
+    /already have a token/
+  );
 
-  assert.equal(first.tokenNumber, 1);
-  assert.equal(second.tokenNumber, 2);
+  assert.equal(fixture.pooja_bookings.length, 0);
 });
 
 test('bookToken reuses the lowest token number released by cancelled bookings', async () => {
@@ -223,7 +529,7 @@ test('bookToken reuses the lowest token number released by cancelled bookings', 
     poojas: [
       {
         id: 'pooja-1',
-        scheduled_at: '2099-01-01T10:00:00.000Z',
+        scheduled_at: hoursFromNow(-1),
         total_tokens: 3,
         status: 'scheduled',
       },
@@ -251,7 +557,7 @@ test('bookToken skips token numbers still reserved by confirmed bookings', async
     poojas: [
       {
         id: 'pooja-1',
-        scheduled_at: '2099-01-01T10:00:00.000Z',
+        scheduled_at: hoursFromNow(-1),
         total_tokens: 2,
         status: 'scheduled',
       },
@@ -302,6 +608,27 @@ test('cancelBookingAsAdmin cancels future confirmed token and releases capacity'
   assert.equal(await poojaService.getBookedTokensCount('pooja-1'), 0);
 });
 
+test('cancelBookingAsAdmin allows cancellation after start until the eight-hour window expires', async () => {
+  const fixture = {
+    poojas: [
+      {
+        id: 'pooja-1',
+        scheduled_at: hoursFromNow(-2),
+        total_tokens: 10,
+        status: 'scheduled',
+      },
+    ],
+    pooja_bookings: [
+      { id: 'booking-1', pooja_id: 'pooja-1', status: 'confirmed', member_count: 1, token_number: 1 },
+    ],
+  };
+  const poojaService = loadPoojaServiceWithFixture(fixture);
+
+  const cancelled = await poojaService.cancelBookingAsAdmin('pooja-1', 'booking-1', 'admin-1');
+
+  assert.equal(cancelled.status, 'cancelled');
+});
+
 test('cancelBookingAsAdmin rejects wrong pooja, already-cancelled, and past pooja tokens', async () => {
   const futureFixture = {
     poojas: [
@@ -345,6 +672,6 @@ test('cancelBookingAsAdmin rejects wrong pooja, already-cancelled, and past pooj
 
   await assert.rejects(
     () => poojaService.cancelBookingAsAdmin('pooja-1', 'booking-1', 'admin-1'),
-    /Cannot cancel a token after the pooja has started/
+    /Cannot cancel a token after the pooja has expired/
   );
 });
