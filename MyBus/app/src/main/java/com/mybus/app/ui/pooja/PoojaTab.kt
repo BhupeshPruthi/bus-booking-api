@@ -70,6 +70,8 @@ fun PoojaTab(
                             onRequireLogin()
                         }
                     },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
                     icon = {
                         Icon(Icons.Filled.History, contentDescription = null)
                     },
