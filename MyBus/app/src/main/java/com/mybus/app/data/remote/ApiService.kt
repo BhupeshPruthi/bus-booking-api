@@ -58,6 +58,9 @@ interface ApiService {
         @Body request: BookPoojaRequest
     ): Response<ApiResponse<PoojaBookingData>>
 
+    @GET("poojas/bookings")
+    suspend fun getMyPoojaBookings(): Response<ApiResponse<List<PoojaTokenHistoryItem>>>
+
     @GET("admin/poojas")
     suspend fun getAdminPoojas(): Response<ApiResponse<List<PoojaListItem>>>
 

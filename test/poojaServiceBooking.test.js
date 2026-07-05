@@ -19,12 +19,33 @@ function makeQuery(table, fixture) {
   let orderByDirection = 'asc';
 
   function rowsForTable() {
-    return fixture[table];
+    const baseTable = table.split(/\s+as\s+/i)[0];
+    return fixture[baseTable] || [];
+  }
+
+  function readRowsForTable() {
+    const baseTable = table.split(/\s+as\s+/i)[0];
+    const rows = rowsForTable();
+    if (baseTable !== 'pooja_bookings' || !fixture.poojas) return rows;
+
+    return rows.map((row) => {
+      const pooja = fixture.poojas.find((item) => item.id === row.pooja_id);
+      if (!pooja) return row;
+      return {
+        ...row,
+        pooja_place: row.pooja_place ?? pooja.place,
+        pooja_scheduled_at: row.pooja_scheduled_at ?? pooja.scheduled_at,
+      };
+    });
+  }
+
+  function columnValue(row, column) {
+    return row[column] ?? row[column.split('.').pop()];
   }
 
   function matches(row) {
     return conditions.every((condition) => {
-      const actual = row[condition.column];
+      const actual = columnValue(row, condition.column);
       switch (condition.operator) {
         case '>':
           return new Date(actual).getTime() > new Date(condition.value).getTime();
@@ -39,6 +60,9 @@ function makeQuery(table, fixture) {
 
   const query = {
     select() {
+      return query;
+    },
+    join() {
       return query;
     },
     leftJoin() {
@@ -104,7 +128,8 @@ function makeQuery(table, fixture) {
     },
     execute() {
       const rows = rowsForTable();
-      const matchingRows = rows.filter(matches);
+      const readRows = operation === 'select' ? readRowsForTable() : rows;
+      const matchingRows = readRows.filter(matches);
 
       if (operation === 'insert') {
         const insertError = fixture.__insertErrors?.[table];
@@ -161,8 +186,8 @@ function makeQuery(table, fixture) {
       const selectedRows = [...matchingRows];
       if (orderByColumn) {
         selectedRows.sort((a, b) => {
-          const left = a[orderByColumn];
-          const right = b[orderByColumn];
+          const left = columnValue(a, orderByColumn);
+          const right = columnValue(b, orderByColumn);
           if (left === right) return 0;
           const result = left > right ? 1 : -1;
           return orderByDirection === 'desc' ? -result : result;
@@ -253,6 +278,86 @@ test('getUpcomingPoojas keeps poojas visible until eight hours after start', asy
   assert.equal(futurePooja.canBook, false);
   assert.equal(futurePooja.bookingOpensAt, fixture.poojas[2].scheduled_at);
   assert.ok(futurePooja.bookingClosesAt);
+});
+
+test('getUserPoojaBookings returns only current user tokens newest first', async () => {
+  const fixture = {
+    poojas: [
+      { id: 'pooja-1', place: 'Temple One', scheduled_at: '2026-07-04T10:00:00.000Z' },
+      { id: 'pooja-2', place: 'Temple Two', scheduled_at: '2026-07-05T10:00:00.000Z' },
+      { id: 'pooja-3', place: 'Temple Three', scheduled_at: '2026-07-06T10:00:00.000Z' },
+    ],
+    pooja_bookings: [
+      {
+        id: 'old-confirmed',
+        pooja_id: 'pooja-1',
+        user_id: 'user-1',
+        name: 'Asha',
+        phone: '9999999999',
+        member_count: 2,
+        city: 'Delhi',
+        token_number: 4,
+        status: 'confirmed',
+        created_at: '2026-07-01T09:00:00.000Z',
+      },
+      {
+        id: 'other-user',
+        pooja_id: 'pooja-2',
+        user_id: 'user-2',
+        name: 'Ravi',
+        phone: '8888888888',
+        member_count: 1,
+        city: 'Noida',
+        token_number: 1,
+        status: 'confirmed',
+        created_at: '2026-07-03T09:00:00.000Z',
+      },
+      {
+        id: 'new-cancelled',
+        pooja_id: 'pooja-3',
+        user_id: 'user-1',
+        name: 'Asha',
+        phone: '9999999999',
+        member_count: 3,
+        city: 'Gurgaon',
+        token_number: 2,
+        status: 'cancelled',
+        cancelled_at: '2026-07-04T12:00:00.000Z',
+        created_at: '2026-07-04T09:00:00.000Z',
+      },
+    ],
+  };
+  const poojaService = loadPoojaServiceWithFixture(fixture);
+
+  const bookings = await poojaService.getUserPoojaBookings('user-1');
+
+  assert.deepEqual(bookings.map((booking) => booking.id), ['new-cancelled', 'old-confirmed']);
+  assert.deepEqual(bookings.map((booking) => booking.status), ['cancelled', 'confirmed']);
+  assert.equal(bookings[0].place, 'Temple Three');
+  assert.equal(bookings[0].scheduledAt, '2026-07-06T10:00:00.000Z');
+  assert.equal(bookings[0].memberCount, 3);
+  assert.equal(bookings[0].city, 'Gurgaon');
+  assert.equal(bookings[0].cancelledAt, '2026-07-04T12:00:00.000Z');
+});
+
+test('getUserPoojaBookings returns an empty list when the user has never booked pooja', async () => {
+  const fixture = {
+    poojas: [],
+    pooja_bookings: [
+      {
+        id: 'other-user',
+        pooja_id: 'pooja-1',
+        user_id: 'user-2',
+        status: 'confirmed',
+        created_at: '2026-07-01T09:00:00.000Z',
+      },
+    ],
+  };
+  const poojaService = loadPoojaServiceWithFixture(fixture);
+
+  const bookings = await poojaService.getUserPoojaBookings('user-1');
+
+  assert.deepEqual(bookings, []);
 });
 
 test('bookToken consumes one token per booking request and keeps member count as metadata', async () => {

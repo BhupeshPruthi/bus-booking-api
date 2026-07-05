@@ -33,6 +33,13 @@ router.get('/buses/:id', consumerController.getBusDetails);
 router.get('/poojas', consumerController.getUpcomingPoojas);
 
 /**
+ * @route GET /api/poojas/bookings
+ * @desc Get current user's pooja token booking history
+ * @access Consumer
+ */
+router.get('/poojas/bookings', authenticate, consumerController.getMyPoojaBookings);
+
+/**
  * @route GET /api/poojas/:id
  * @desc Get pooja details
  * @access Public

@@ -26,6 +26,11 @@ const getPoojaDetails = asyncHandler(async (req, res) => {
   res.json({ success: true, data: result });
 });
 
+const getMyPoojaBookings = asyncHandler(async (req, res) => {
+  const result = await poojaService.getUserPoojaBookings(req.user.id);
+  res.json({ success: true, data: result });
+});
+
 const bookPoojaToken = asyncHandler(async (req, res) => {
   const result = await poojaService.bookToken(req.params.id, req.user.id, req.body);
   res.status(201).json({ success: true, data: result });
@@ -89,6 +94,7 @@ module.exports = {
   getBusDetails,
   getUpcomingPoojas,
   getPoojaDetails,
+  getMyPoojaBookings,
   bookPoojaToken,
   getUpcomingEvents,
   getEventImage,

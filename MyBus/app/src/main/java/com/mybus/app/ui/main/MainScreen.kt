@@ -29,6 +29,7 @@ import com.mybus.app.ui.home.HomeTab
 import com.mybus.app.ui.navigation.BottomTabs
 import com.mybus.app.ui.theme.BrandOrange
 import com.mybus.app.ui.theme.TabBarIndicatorGradientFill
+import com.mybus.app.ui.pooja.MyPoojaTokensScreen
 import com.mybus.app.ui.pooja.PoojaBookingScreen
 import com.mybus.app.ui.pooja.PoojaDetailScreen
 import com.mybus.app.ui.pooja.PoojaTab
@@ -73,6 +74,7 @@ fun MainScreen(
             "add_event",
             "select_stops",
             "schedule_pooja",
+            "my_pooja_tokens",
             "pooja_upcoming_list",
             "bus_detail/{busId}",
             "admin_bus_detail/{busId}",
@@ -201,6 +203,11 @@ fun MainScreen(
                     },
                     onBookPoojaClick = { poojaId ->
                         tabNavController.navigate("pooja_book/$poojaId")
+                    },
+                    onMyTokensClick = {
+                        tabNavController.navigate("my_pooja_tokens") {
+                            launchSingleTop = true
+                        }
                     }
                 )
             }
@@ -264,6 +271,13 @@ fun MainScreen(
             composable("schedule_pooja") {
                 SchedulePoojaScreen(
                     onBack = { tabNavController.popBackStack() }
+                )
+            }
+            composable("my_pooja_tokens") {
+                MyPoojaTokensScreen(
+                    onBack = { tabNavController.popBackStack() },
+                    isLoggedIn = isLoggedIn,
+                    onRequireLogin = onRequireLogin
                 )
             }
             composable("pooja_upcoming_list") {

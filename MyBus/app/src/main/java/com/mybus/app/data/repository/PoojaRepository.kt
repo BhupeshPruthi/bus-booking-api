@@ -118,6 +118,22 @@ class PoojaRepository @Inject constructor(
         }
     }
 
+    suspend fun getMyPoojaBookings(): Result<List<PoojaTokenHistoryItem>> {
+        return try {
+            val response = apiService.getMyPoojaBookings()
+            if (response.isSuccessful && response.body()?.success == true) {
+                Result.success(response.body()!!.data ?: emptyList())
+            } else if (response.code() == 401) {
+                Result.failure(AuthenticationRequiredException())
+            } else {
+                val msg = errorMessage(response, "Failed to load pooja tokens")
+                Result.failure(Exception(msg))
+            }
+        } catch (e: Exception) {
+            Result.failure(Exception("Network error: ${e.message}"))
+        }
+    }
+
     suspend fun cancelPoojaBookingAsAdmin(
         poojaId: String,
         bookingId: String

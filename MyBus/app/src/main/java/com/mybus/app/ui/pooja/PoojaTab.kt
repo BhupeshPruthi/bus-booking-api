@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.ConfirmationNumber
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.SelfImprovement
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -35,7 +36,8 @@ fun PoojaTab(
     onRequireLogin: () -> Unit,
     onAddClick: () -> Unit,
     onPoojaClick: (poojaId: String) -> Unit,
-    onBookPoojaClick: (poojaId: String) -> Unit
+    onBookPoojaClick: (poojaId: String) -> Unit,
+    onMyTokensClick: () -> Unit
 ) {
     val listViewModel: PoojaListViewModel = hiltViewModel()
     val listState by listViewModel.uiState.collectAsState()
@@ -57,6 +59,23 @@ fun PoojaTab(
                     }
                 }
             )
+        },
+        floatingActionButton = {
+            if (!isAdmin) {
+                ExtendedFloatingActionButton(
+                    onClick = {
+                        if (isLoggedIn) {
+                            onMyTokensClick()
+                        } else {
+                            onRequireLogin()
+                        }
+                    },
+                    icon = {
+                        Icon(Icons.Filled.History, contentDescription = null)
+                    },
+                    text = { Text("My Tokens") }
+                )
+            }
         }
     ) { innerPadding ->
         Box(
@@ -108,7 +127,12 @@ fun PoojaTab(
                 }
                 else -> {
                     LazyColumn(
-                        contentPadding = PaddingValues(16.dp),
+                        contentPadding = PaddingValues(
+                            start = 16.dp,
+                            top = 16.dp,
+                            end = 16.dp,
+                            bottom = if (isAdmin) 16.dp else 96.dp
+                        ),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         items(listState.poojas, key = { it.id }) { pooja ->

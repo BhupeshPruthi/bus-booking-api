@@ -78,6 +78,20 @@ class PoojaService {
     return this.formatPooja(pooja, bookedTokens);
   }
 
+  async getUserPoojaBookings(userId) {
+    const bookings = await db('pooja_bookings')
+      .join('poojas', 'pooja_bookings.pooja_id', 'poojas.id')
+      .select(
+        'pooja_bookings.*',
+        'poojas.place as pooja_place',
+        'poojas.scheduled_at as pooja_scheduled_at'
+      )
+      .where('pooja_bookings.user_id', userId)
+      .orderBy('pooja_bookings.created_at', 'desc');
+
+    return bookings.map((booking) => this.formatUserPoojaBooking(booking));
+  }
+
   async bookToken(poojaId, userId, data) {
     return db.transaction(async (trx) => {
       const memberCount = parseInt(data.memberCount ?? 1, 10);
@@ -341,6 +355,24 @@ class PoojaService {
       user: row.user_mobile
         ? { mobile: row.user_mobile, name: row.user_name }
         : undefined,
+    };
+  }
+
+  formatUserPoojaBooking(row) {
+    return {
+      id: row.id,
+      poojaId: row.pooja_id,
+      userId: row.user_id,
+      name: row.name,
+      phone: row.phone,
+      place: row.pooja_place || row.place,
+      scheduledAt: row.pooja_scheduled_at || row.scheduled_at,
+      memberCount: row.member_count || 1,
+      city: row.city || DEFAULT_POOJA_CITY,
+      tokenNumber: row.token_number,
+      status: row.status,
+      cancelledAt: row.cancelled_at,
+      createdAt: row.created_at,
     };
   }
 }

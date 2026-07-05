@@ -57,6 +57,23 @@ data class PoojaBookingData(
 )
 
 @JsonClass(generateAdapter = true)
+data class PoojaTokenHistoryItem(
+    @Json(name = "id") val id: String,
+    @Json(name = "poojaId") val poojaId: String,
+    @Json(name = "userId") val userId: String? = null,
+    @Json(name = "name") val name: String,
+    @Json(name = "phone") val phone: String,
+    @Json(name = "place") val place: String,
+    @Json(name = "scheduledAt") val scheduledAt: String,
+    @Json(name = "memberCount") val memberCount: Int = 1,
+    @Json(name = "city") val city: String = "Delhi - NCR",
+    @Json(name = "tokenNumber") val tokenNumber: Int? = null,
+    @Json(name = "status") val status: String,
+    @Json(name = "cancelledAt") val cancelledAt: String? = null,
+    @Json(name = "createdAt") val createdAt: String? = null
+)
+
+@JsonClass(generateAdapter = true)
 data class PoojaDetailData(
     @Json(name = "id") val id: String,
     @Json(name = "scheduledAt") val scheduledAt: String,
