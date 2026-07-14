@@ -32,10 +32,14 @@ app.use(cors({
   credentials: true,
 }));
 
-// Rate limiting
+// Rate limiting. Keep token refresh out of the general IP bucket so a burst of normal
+// app traffic cannot prevent users from renewing an expired access token.
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per window
+  max: parseInt(process.env.API_RATE_LIMIT_MAX, 10) || 1000,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => req.originalUrl.split('?')[0] === '/api/auth/refresh-token',
   message: {
     success: false,
     error: { code: 'RATE_LIMITED', message: 'Too many requests, please try again later' },

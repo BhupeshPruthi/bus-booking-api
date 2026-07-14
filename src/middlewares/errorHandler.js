@@ -7,11 +7,13 @@ const config = require('../config');
 const errorHandler = (err, req, res, next) => {
   const statusCode = err.statusCode || 500;
   const isOperational = err.isOperational || false;
+  const shouldLogStack = !isOperational || statusCode >= 500;
+  const logLevel = shouldLogStack ? 'error' : 'warn';
 
-  // Log error
-  logger.error({
+  // Expected client errors, such as expired JWTs, are useful but should not look like crashes.
+  logger[logLevel]({
     message: err.message,
-    stack: err.stack,
+    ...(shouldLogStack && { stack: err.stack }),
     statusCode,
     path: req.path,
     method: req.method,
@@ -26,7 +28,7 @@ const errorHandler = (err, req, res, next) => {
       code: err.code || 'INTERNAL_ERROR',
       message: isOperational ? err.message : 'Internal server error',
       ...(err.details && { details: err.details }),
-      ...(config.env === 'development' && { stack: err.stack }),
+      ...(config.env === 'development' && shouldLogStack && { stack: err.stack }),
     },
   });
 };

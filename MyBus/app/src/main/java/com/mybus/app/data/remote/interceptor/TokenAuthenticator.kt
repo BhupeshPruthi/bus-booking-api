@@ -12,7 +12,6 @@ import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import javax.inject.Inject
-import javax.inject.Provider
 
 class TokenAuthenticator @Inject constructor(
     private val tokenManager: TokenManager,
@@ -23,17 +22,26 @@ class TokenAuthenticator @Inject constructor(
     override fun authenticate(route: Route?, response: Response): Request? {
         if (responseCount(response) >= 2) return null
 
-        val refreshToken = runBlocking { tokenManager.refreshToken.firstOrNull() } ?: return null
+        val requestAccessToken = response.request.header("Authorization")?.bearerToken()
+        return synchronized(this) {
+            val currentAccessToken = runBlocking { tokenManager.accessToken.firstOrNull() }
+            if (!currentAccessToken.isNullOrBlank() && currentAccessToken != requestAccessToken) {
+                return@synchronized response.request.newBuilder()
+                    .header("Authorization", "Bearer $currentAccessToken")
+                    .build()
+            }
 
-        val newTokens = runBlocking { refreshAccessToken(refreshToken) } ?: return null
+            val refreshToken = runBlocking { tokenManager.refreshToken.firstOrNull() } ?: return@synchronized null
+            val newTokens = runBlocking { refreshAccessToken(refreshToken) } ?: return@synchronized null
 
-        runBlocking {
-            tokenManager.saveTokens(newTokens.accessToken, newTokens.refreshToken)
+            runBlocking {
+                tokenManager.saveTokens(newTokens.accessToken, newTokens.refreshToken)
+            }
+
+            response.request.newBuilder()
+                .header("Authorization", "Bearer ${newTokens.accessToken}")
+                .build()
         }
-
-        return response.request.newBuilder()
-            .header("Authorization", "Bearer ${newTokens.accessToken}")
-            .build()
     }
 
     private fun refreshAccessToken(refreshToken: String): TokenData? {
@@ -48,19 +56,20 @@ class TokenAuthenticator @Inject constructor(
                 .build()
 
             val client = OkHttpClient.Builder().build()
-            val response = client.newCall(request).execute()
 
-            if (response.isSuccessful) {
-                val responseBody = response.body?.string() ?: return null
-                val type = com.squareup.moshi.Types.newParameterizedType(
-                    ApiResponse::class.java, TokenData::class.java
-                )
-                val adapter = moshi.adapter<ApiResponse<TokenData>>(type)
-                val apiResponse = adapter.fromJson(responseBody)
-                apiResponse?.data
-            } else {
-                runBlocking { tokenManager.clear() }
-                null
+            client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) {
+                    val responseBody = response.body?.string() ?: return null
+                    val type = com.squareup.moshi.Types.newParameterizedType(
+                        ApiResponse::class.java, TokenData::class.java
+                    )
+                    val adapter = moshi.adapter<ApiResponse<TokenData>>(type)
+                    val apiResponse = adapter.fromJson(responseBody)
+                    apiResponse?.data
+                } else {
+                    runBlocking { tokenManager.clear() }
+                    null
+                }
             }
         } catch (_: Exception) {
             null
@@ -75,5 +84,11 @@ class TokenAuthenticator @Inject constructor(
             prior = prior.priorResponse
         }
         return count
+    }
+
+    private fun String.bearerToken(): String? {
+        return removePrefix("Bearer ")
+            .trim()
+            .takeIf { it.isNotBlank() && it != this }
     }
 }

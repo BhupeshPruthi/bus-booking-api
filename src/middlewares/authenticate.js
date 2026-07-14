@@ -21,9 +21,9 @@ const authenticate = (req, res, next) => {
     next();
   } catch (error) {
     if (error.name === 'TokenExpiredError') {
-      next(new UnauthorizedError('Token expired'));
+      next(new UnauthorizedError('Token expired', 'TOKEN_EXPIRED'));
     } else if (error.name === 'JsonWebTokenError') {
-      next(new UnauthorizedError('Invalid token'));
+      next(new UnauthorizedError('Invalid token', 'INVALID_TOKEN'));
     } else {
       next(error);
     }

@@ -25,8 +25,8 @@ class ValidationError extends AppError {
  * 401 Unauthorized - Authentication errors
  */
 class UnauthorizedError extends AppError {
-  constructor(message = 'Unauthorized') {
-    super(message, 401, 'UNAUTHORIZED');
+  constructor(message = 'Unauthorized', code = 'UNAUTHORIZED') {
+    super(message, 401, code);
   }
 }
 
