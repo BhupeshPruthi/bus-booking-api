@@ -136,6 +136,29 @@ npm run api:list
 
 Manifest: [`src/docs/api-routes.json`](src/docs/api-routes.json).
 
+## Stay administration
+
+The Stay business uses scoped admin types while retaining `users.role = 'admin'`
+for backward compatibility:
+
+| `admin_type` | Access |
+|---|---|
+| `bus_admin` | Bus, Pooja, and Event administration |
+| `stay_admin` | Stay administration |
+| `super_admin` | All administration, including assigning admin access |
+
+The Stay migration automatically maps existing admins to
+`bus_admin`, preserving their existing Bus, Pooja, and Event access. Super
+Admins can assign, change, or revoke admin access from the Android app. Admin
+authorization is checked against the current database row on every protected
+request, so a role change takes effect immediately.
+
+Stay uses aggregate inventory rather than numbered rooms. Pending requests do
+not reserve inventory; confirmation atomically checks availability. Prices
+include taxes, and each request stores an immutable price snapshot. Chargeable
+mattresses can be requested, but their availability and price are coordinated
+directly by the Stay Admin.
+
 ## CI
 
 GitHub Actions runs `npm ci`, `node --check` on push/PR to `main` or `master` (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)).

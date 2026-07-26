@@ -183,6 +183,94 @@ const bookPoojaTokenSchema = Joi.object({
 
 const adminCancelPoojaBookingSchema = Joi.object({});
 
+// ============ STAY SCHEMAS ============
+
+const stayDateSchema = Joi.string()
+  .pattern(/^\d{4}-\d{2}-\d{2}$/)
+  .required()
+  .messages({ 'string.pattern.base': 'Date must use YYYY-MM-DD' });
+
+const stayBookingItemSchema = Joi.object({
+  unitTypeCode: Joi.string()
+    .valid('three_bed_room', 'four_bed_room', 'five_bed_room', 'hall')
+    .required(),
+  quantity: Joi.number().integer().min(1).max(13).required(),
+});
+
+const stayQuoteSchema = Joi.object({
+  checkInDate: stayDateSchema,
+  checkOutDate: stayDateSchema,
+  items: Joi.array().items(stayBookingItemSchema).unique('unitTypeCode').default([]),
+});
+
+const createStayBookingSchema = stayQuoteSchema.keys({
+  items: Joi.array().items(stayBookingItemSchema).unique('unitTypeCode').min(1).required(),
+  guestCount: Joi.number().integer().min(1).required(),
+  contactName: Joi.string().max(200).trim().required(),
+  contactEmail: Joi.string().email().max(320).lowercase().trim().required(),
+  contactPhone: Joi.string().pattern(/^[0-9+ -]{7,20}$/).trim().required(),
+  cancellationPolicyAccepted: Joi.boolean().valid(true).required(),
+  mattressRequested: Joi.boolean().default(false),
+  customerNote: Joi.string().max(1000).allow('', null).trim(),
+});
+
+const stayBookingListSchema = Joi.object({
+  status: Joi.string().valid(
+    'pending',
+    'confirmed',
+    'cancellation_requested',
+    'rejected',
+    'cancelled',
+    'completed'
+  ),
+  fromDate: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/),
+  toDate: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/),
+  search: Joi.string().max(200).trim(),
+}).concat(paginationSchema);
+
+const stayCancellationSchema = Joi.object({
+  reason: Joi.string().max(1000).allow('', null).trim(),
+});
+
+const stayCancellationListSchema = Joi.object({
+  status: Joi.string().valid('pending', 'approved', 'rejected'),
+}).concat(paginationSchema);
+
+const stayRejectionSchema = Joi.object({
+  reason: Joi.string().max(1000).trim().required(),
+});
+
+const stayCancellationDecisionSchema = Joi.object({
+  action: Joi.string().valid('approve', 'reject').required(),
+  refundDecision: Joi.when('action', {
+    is: 'approve',
+    then: Joi.string().valid('full', 'partial', 'none').required(),
+    otherwise: Joi.forbidden(),
+  }),
+  refundAmount: Joi.when('refundDecision', {
+    is: 'partial',
+    then: Joi.number().min(0.01).precision(2).required(),
+    otherwise: Joi.number().min(0).precision(2),
+  }),
+  reason: Joi.when('action', {
+    is: 'reject',
+    then: Joi.string().max(1000).trim().required(),
+    otherwise: Joi.string().max(1000).allow('', null).trim(),
+  }),
+});
+
+const updateStayUnitTypeSchema = Joi.object({
+  nightlyRate: Joi.number().positive().precision(2).required(),
+  changeNote: Joi.string().max(500).allow('', null).trim(),
+});
+
+const updateAdminTypeSchema = Joi.object({
+  adminType: Joi.string()
+    .valid('consumer', 'bus_admin', 'stay_admin', 'super_admin')
+    .required(),
+  reason: Joi.string().max(1000).trim().required(),
+});
+
 // ============ EVENTS SCHEMAS ============
 
 const createEventSchema = Joi.object({
@@ -240,6 +328,17 @@ module.exports = {
   createPoojaSchema,
   bookPoojaTokenSchema,
   adminCancelPoojaBookingSchema,
+
+  // Stay
+  stayQuoteSchema,
+  createStayBookingSchema,
+  stayBookingListSchema,
+  stayCancellationSchema,
+  stayCancellationListSchema,
+  stayRejectionSchema,
+  stayCancellationDecisionSchema,
+  updateStayUnitTypeSchema,
+  updateAdminTypeSchema,
 
   // Events
   createEventSchema,

@@ -13,6 +13,7 @@ const { errorHandler, notFoundHandler } = require('./middlewares/errorHandler');
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
 const consumerRoutes = require('./routes/consumer');
+const stayRoutes = require('./routes/stay');
 
 // Import cron jobs
 const { startExpireBookingsJob } = require('./jobs/expireBookings');
@@ -84,6 +85,7 @@ app.get('/health', (req, res) => {
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/stays', stayRoutes);
 app.use('/api', consumerRoutes);
 
 // 404 handler

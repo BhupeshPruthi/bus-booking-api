@@ -5,6 +5,10 @@ const { db } = require('../config/database');
 const config = require('../config');
 const { UnauthorizedError, ValidationError } = require('../utils/errors');
 const logger = require('../utils/logger');
+const {
+  normalizeAdminType,
+  capabilitiesFor,
+} = require('./adminCapabilityService');
 
 function maskGoogleClientId(value) {
   if (!value) return undefined;
@@ -139,6 +143,14 @@ class AuthService {
         name: user.name,
         role: user.role,
         isSuperUser: this.isSuperUser(user),
+        adminType: normalizeAdminType({
+          ...user,
+          isSuperUser: this.isSuperUser(user),
+        }),
+        capabilities: capabilitiesFor({
+          ...user,
+          isSuperUser: this.isSuperUser(user),
+        }),
         isNewUser,
       },
     };
@@ -155,6 +167,14 @@ class AuthService {
         email: user.email,
         role: user.role,
         isSuperUser: this.isSuperUser(user),
+        adminType: normalizeAdminType({
+          ...user,
+          isSuperUser: this.isSuperUser(user),
+        }),
+        capabilities: capabilitiesFor({
+          ...user,
+          isSuperUser: this.isSuperUser(user),
+        }),
       },
       config.jwt.secret,
       { expiresIn: config.jwt.expiresIn }
