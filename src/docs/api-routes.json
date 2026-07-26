@@ -20,6 +20,7 @@
     { "method": "POST", "path": "/api/auth/google", "auth": "none", "group": "auth" },
     { "method": "POST", "path": "/api/auth/refresh-token", "auth": "none", "group": "auth" },
     { "method": "POST", "path": "/api/auth/logout", "auth": "none", "group": "auth" },
+    { "method": "GET", "path": "/api/auth/session", "auth": "bearer", "group": "auth" },
     { "method": "GET", "path": "/api/buses", "auth": "none", "group": "consumer" },
     { "method": "GET", "path": "/api/buses/:id", "auth": "none", "group": "consumer" },
     { "method": "GET", "path": "/api/poojas", "auth": "none", "group": "consumer" },

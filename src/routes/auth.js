@@ -1,5 +1,6 @@
 const express = require('express');
 const authController = require('../controllers/authController');
+const { authenticate } = require('../middlewares/authenticate');
 const validate = require('../middlewares/validate');
 const { googleSignInSchema, refreshTokenSchema } = require('../validators/schemas');
 
@@ -25,5 +26,12 @@ router.post('/refresh-token', validate(refreshTokenSchema), authController.refre
  * @access Public
  */
 router.post('/logout', validate(refreshTokenSchema), authController.logout);
+
+/**
+ * @route GET /api/auth/session
+ * @desc Return the database-resolved role, admin type, and capabilities
+ * @access Authenticated
+ */
+router.get('/session', authenticate, authController.session);
 
 module.exports = router;

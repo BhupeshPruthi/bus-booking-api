@@ -1,41 +1,37 @@
-const config = require('../config');
-const { db } = require('../config/database');
-const { ForbiddenError } = require('../utils/errors');
+const { ForbiddenError, UnauthorizedError } = require('../utils/errors');
+const logger = require('../utils/logger');
+const sessionService = require('../services/sessionService');
 const {
   CAPABILITIES,
   ADMIN_TYPES,
+  capabilitiesFor,
   normalizeAdminType,
   hasCapability,
 } = require('../services/adminCapabilityService');
 
-function withConfiguredSuperUser(req) {
-  const user = req.user;
-  if (!user) return null;
-  const isConfiguredSuperUser =
-    (config.superUserMobile && user.mobile === config.superUserMobile) ||
-    (config.superUserEmail &&
-      user.email &&
-      String(user.email).toLowerCase() === config.superUserEmail);
-  return isConfiguredSuperUser ? { ...user, isSuperUser: true } : user;
-}
-
-async function currentUser(req) {
-  if (!req.user?.id) return null;
-  const row = await db('users')
-    .select('id', 'mobile', 'email', 'role', 'admin_type')
-    .where('id', req.user.id)
-    .first();
-  return withConfiguredSuperUser(row);
+function logDenial(req, user, requiredCapability) {
+  logger.warn({
+    message: 'Authorization denied',
+    event: 'authorization_denied',
+    userId: user?.id || req.user?.id || null,
+    role: user?.role || null,
+    adminType: normalizeAdminType(user),
+    requiredCapability,
+    resolvedCapabilities: capabilitiesFor(user),
+    path: req.originalUrl || req.path,
+    method: req.method,
+  });
 }
 
 const requireCapability = (capability, message) => async (req, res, next) => {
   if (!req.user) {
-    return next(new ForbiddenError('User not authenticated'));
+    return next(new UnauthorizedError('User not authenticated'));
   }
 
   try {
-    const user = await currentUser(req);
+    const user = await sessionService.getCurrentUser(req.user.id);
     if (!hasCapability(user, capability)) {
+      logDenial(req, user, capability);
       return next(new ForbiddenError(message));
     }
     req.user = { ...req.user, ...user };
@@ -67,10 +63,11 @@ const adminManagerOnly = requireCapability(
 );
 
 const superAdminOnly = async (req, res, next) => {
-  if (!req.user) return next(new ForbiddenError('User not authenticated'));
+  if (!req.user) return next(new UnauthorizedError('User not authenticated'));
   try {
-    const user = await currentUser(req);
+    const user = await sessionService.getCurrentUser(req.user.id);
     if (normalizeAdminType(user) !== ADMIN_TYPES.SUPER) {
+      logDenial(req, user, CAPABILITIES.ADMIN_MANAGE);
       return next(new ForbiddenError('Access denied. Super Admin required.'));
     }
     req.user = { ...req.user, ...user };

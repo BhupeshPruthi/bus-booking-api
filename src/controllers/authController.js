@@ -1,4 +1,5 @@
 const authService = require('../services/authService');
+const sessionService = require('../services/sessionService');
 const asyncHandler = require('../utils/asyncHandler');
 
 /**
@@ -42,8 +43,22 @@ const logout = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * Return the server/database-resolved identity and permissions for the current token.
+ * GET /api/auth/session
+ */
+const session = asyncHandler(async (req, res) => {
+  const result = await sessionService.getSession(req.user.id);
+
+  res.json({
+    success: true,
+    data: result,
+  });
+});
+
 module.exports = {
   signInWithGoogle,
   refreshToken,
   logout,
+  session,
 };
