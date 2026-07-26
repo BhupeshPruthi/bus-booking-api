@@ -9,13 +9,16 @@ const {
 } = require('../src/services/adminCapabilityService');
 const {
   nightsBetween,
+  databaseDateOnly,
   checkInInstant,
   calculateLineTotal,
+  calculateGuestCapacity,
   refundEligibility,
 } = require('../src/services/stayService').helpers;
 const { INVENTORY_HOLDING_STATUSES } = require('../src/services/stayService').constants;
 const {
   stayCancellationDecisionSchema,
+  createStayBookingSchema,
   updateAdminTypeSchema,
 } = require('../src/validators/schemas');
 
@@ -84,11 +87,38 @@ test('Stay check-in instant is 11 AM India time', () => {
   assert.equal(checkInInstant('2026-08-01').toISOString(), '2026-08-01T05:30:00.000Z');
 });
 
+test('PostgreSQL DATE values retain their calendar date', () => {
+  const postgresDate = new Date(2026, 7, 1);
+  assert.equal(databaseDateOnly(postgresDate, 'check_in_date'), '2026-08-01');
+  assert.equal(databaseDateOnly('2026-08-01', 'check_in_date'), '2026-08-01');
+});
+
 test('Stay prices are inclusive per unit per night totals', () => {
   assert.equal(calculateLineTotal(1200, 2, 3), 7200);
   assert.equal(calculateLineTotal(1500, 1, 1), 1500);
   assert.equal(calculateLineTotal(1600, 1, 2), 3200);
   assert.equal(calculateLineTotal(3500, 3, 1), 10500);
+});
+
+test('Stay guest capacity is derived from the selected accommodation', () => {
+  assert.equal(calculateGuestCapacity([
+    { capacity_per_unit: 3, quantity: 2 },
+    { capacity_per_unit: 4, quantity: 1 },
+  ]), 10);
+});
+
+test('Stay guest count cannot exceed the PostgreSQL integer range', () => {
+  const result = createStayBookingSchema.validate({
+    checkInDate: '2026-08-01',
+    checkOutDate: '2026-08-02',
+    items: [{ unitTypeCode: 'three_bed_room', quantity: 1 }],
+    guestCount: 2147483648,
+    contactName: 'Guest',
+    contactEmail: 'guest@example.com',
+    contactPhone: '9999999999',
+    cancellationPolicyAccepted: true,
+  });
+  assert.match(result.error?.message || '', /less than or equal to 2147483647/);
 });
 
 test('Stay duration is capped at exactly seven nights', () => {

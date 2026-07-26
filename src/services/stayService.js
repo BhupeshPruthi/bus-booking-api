@@ -26,6 +26,19 @@ function dateOnly(value, fieldName) {
   return text;
 }
 
+function databaseDateOnly(value, fieldName) {
+  if (value instanceof Date && Number.isFinite(value.getTime())) {
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, '0');
+    const day = String(value.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  const text = String(value || '');
+  const datePrefix = text.match(/^(\d{4}-\d{2}-\d{2})(?:$|T|\s)/)?.[1];
+  return dateOnly(datePrefix || text, fieldName);
+}
+
 function nightsBetween(checkInDate, checkOutDate) {
   const start = Date.parse(`${checkInDate}T00:00:00.000Z`);
   const end = Date.parse(`${checkOutDate}T00:00:00.000Z`);
@@ -57,6 +70,14 @@ function money(value) {
 
 function calculateLineTotal(nightlyRate, quantity, nightCount) {
   return money(Number(nightlyRate) * Number(quantity) * Number(nightCount));
+}
+
+function calculateGuestCapacity(items) {
+  return items.reduce(
+    (total, item) =>
+      total + Number(item.capacity_per_unit ?? item.capacity ?? 0) * Number(item.quantity),
+    0
+  );
 }
 
 function refundEligibility(checkInDate, requestedAt = new Date()) {
@@ -204,6 +225,13 @@ class StayService {
           line_total: lineTotal,
         };
       });
+      const guestCount = Number(data.guestCount);
+      const guestCapacity = calculateGuestCapacity(items);
+      if (guestCount > guestCapacity) {
+        throw new ValidationError(
+          `Guest count cannot exceed the selected accommodation capacity of ${guestCapacity}`
+        );
+      }
 
       const [booking] = await trx('stay_bookings').insert({
         reference: bookingReference(now),
@@ -212,7 +240,7 @@ class StayService {
         check_in_date: checkInDate,
         check_out_date: checkOutDate,
         night_count: nightCount,
-        guest_count: Number(data.guestCount),
+        guest_count: guestCount,
         contact_name: String(data.contactName).trim(),
         contact_email: String(data.contactEmail).trim(),
         contact_phone: String(data.contactPhone).trim(),
@@ -239,7 +267,9 @@ class StayService {
       if (booking.status !== 'pending') {
         throw new ValidationError(`Cannot confirm booking with status: ${booking.status}`);
       }
-      if (checkInInstant(String(booking.check_in_date).slice(0, 10)) <= new Date()) {
+      const checkInDate = databaseDateOnly(booking.check_in_date, 'check_in_date');
+      const checkOutDate = databaseDateOnly(booking.check_out_date, 'check_out_date');
+      if (checkInInstant(checkInDate) <= new Date()) {
         throw new ValidationError('Cannot confirm a booking after check-in has started');
       }
       const items = await trx('stay_booking_items').where('booking_id', bookingId);
@@ -248,8 +278,8 @@ class StayService {
         const reserved = await this.reservedQuantity(
           trx,
           item.unit_type_id,
-          String(booking.check_in_date).slice(0, 10),
-          String(booking.check_out_date).slice(0, 10),
+          checkInDate,
+          checkOutDate,
           booking.id
         );
         const available = Number(type.total_inventory) - reserved;
@@ -304,7 +334,7 @@ class StayService {
       if (!['pending', 'confirmed'].includes(booking.status)) {
         throw new ValidationError(`Cannot request cancellation with status: ${booking.status}`);
       }
-      const checkInDate = String(booking.check_in_date).slice(0, 10);
+      const checkInDate = databaseDateOnly(booking.check_in_date, 'check_in_date');
       const now = new Date();
       if (checkInInstant(checkInDate) <= now) {
         throw new ValidationError('Cancellation cannot be requested after check-in has started');
@@ -450,7 +480,7 @@ class StayService {
       .where('check_out_date', '<=', now.toISOString().slice(0, 10));
     let count = 0;
     for (const booking of candidates) {
-      const checkOutDate = String(booking.check_out_date).slice(0, 10);
+      const checkOutDate = databaseDateOnly(booking.check_out_date, 'check_out_date');
       if (checkoutInstant(checkOutDate) > now) continue;
       await db.transaction(async (trx) => {
         const current = await trx('stay_bookings').where('id', booking.id).forUpdate().first();
@@ -661,8 +691,8 @@ class StayService {
       reference: row.reference,
       userId: row.user_id,
       status: row.status,
-      checkInDate: String(row.check_in_date).slice(0, 10),
-      checkOutDate: String(row.check_out_date).slice(0, 10),
+      checkInDate: databaseDateOnly(row.check_in_date, 'check_in_date'),
+      checkOutDate: databaseDateOnly(row.check_out_date, 'check_out_date'),
       nightCount: Number(row.night_count),
       guestCount: Number(row.guest_count),
       contactName: row.contact_name,
@@ -708,8 +738,12 @@ class StayService {
       contactName: row.contact_name,
       contactPhone: row.contact_phone,
       contactEmail: row.contact_email,
-      checkInDate: row.check_in_date ? String(row.check_in_date).slice(0, 10) : undefined,
-      checkOutDate: row.check_out_date ? String(row.check_out_date).slice(0, 10) : undefined,
+      checkInDate: row.check_in_date
+        ? databaseDateOnly(row.check_in_date, 'check_in_date')
+        : undefined,
+      checkOutDate: row.check_out_date
+        ? databaseDateOnly(row.check_out_date, 'check_out_date')
+        : undefined,
       totalAmount: row.total_amount === undefined ? undefined : money(row.total_amount),
     };
   }
@@ -727,10 +761,12 @@ module.exports.constants = {
 };
 module.exports.helpers = {
   dateOnly,
+  databaseDateOnly,
   nightsBetween,
   checkInInstant,
   checkoutInstant,
   money,
   calculateLineTotal,
+  calculateGuestCapacity,
   refundEligibility,
 };

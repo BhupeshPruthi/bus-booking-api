@@ -205,7 +205,7 @@ const stayQuoteSchema = Joi.object({
 
 const createStayBookingSchema = stayQuoteSchema.keys({
   items: Joi.array().items(stayBookingItemSchema).unique('unitTypeCode').min(1).required(),
-  guestCount: Joi.number().integer().min(1).required(),
+  guestCount: Joi.number().integer().min(1).max(2147483647).required(),
   contactName: Joi.string().max(200).trim().required(),
   contactEmail: Joi.string().email().max(320).lowercase().trim().required(),
   contactPhone: Joi.string().pattern(/^[0-9+ -]{7,20}$/).trim().required(),
