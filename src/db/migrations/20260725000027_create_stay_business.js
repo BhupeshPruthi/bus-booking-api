@@ -72,7 +72,9 @@ exports.up = async function (knex) {
     table.string('contact_email', 320).notNullable();
     table.string('contact_phone', 20).notNullable();
     table.decimal('total_amount', 12, 2).notNullable();
-    table.boolean('mattress_requested').notNullable().defaultTo(false);
+    table.integer('mattress_quantity').notNullable().defaultTo(0);
+    table.decimal('mattress_nightly_rate', 12, 2).notNullable().defaultTo(200);
+    table.decimal('mattress_total', 12, 2).notNullable().defaultTo(0);
     table.text('customer_note').nullable();
     table.boolean('cancellation_policy_accepted').notNullable().defaultTo(false);
     table.uuid('confirmed_by').nullable().references('id').inTable('users').onDelete('SET NULL');

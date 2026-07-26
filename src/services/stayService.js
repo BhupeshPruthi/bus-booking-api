@@ -7,8 +7,10 @@ const {
 } = require('../utils/errors');
 
 const REFUND_CUTOFF_HOURS = 48;
-const CHECK_IN_HOUR_IST = 11;
+const CHECK_IN_HOUR_IST = 12;
+const CHECK_OUT_HOUR_IST = 11;
 const MAX_NIGHTS = 7;
+const MATTRESS_NIGHTLY_RATE = 200;
 const UNIT_TYPE_CODES = ['three_bed_room', 'four_bed_room', 'five_bed_room', 'hall'];
 const INVENTORY_HOLDING_STATUSES = ['confirmed', 'cancellation_requested'];
 const TERMINAL_STATUSES = ['rejected', 'cancelled', 'completed'];
@@ -52,16 +54,16 @@ function nightsBetween(checkInDate, checkOutDate) {
   return nights;
 }
 
-function stayBoundaryInstant(date) {
-  return new Date(`${date}T${String(CHECK_IN_HOUR_IST).padStart(2, '0')}:00:00+05:30`);
+function stayBoundaryInstant(date, hour) {
+  return new Date(`${date}T${String(hour).padStart(2, '0')}:00:00+05:30`);
 }
 
 function checkInInstant(checkInDate) {
-  return stayBoundaryInstant(checkInDate);
+  return stayBoundaryInstant(checkInDate, CHECK_IN_HOUR_IST);
 }
 
 function checkoutInstant(checkOutDate) {
-  return stayBoundaryInstant(checkOutDate);
+  return stayBoundaryInstant(checkOutDate, CHECK_OUT_HOUR_IST);
 }
 
 function money(value) {
@@ -114,14 +116,15 @@ class StayService {
   async getCatalog() {
     const types = await this.currentTypes();
     return {
-      checkInTime: '11:00',
+      checkInTime: '12:00',
       checkOutTime: '11:00',
       timezone: 'Asia/Kolkata',
       currency: 'INR',
       pricesIncludeTaxes: true,
       refundCutoffHours: REFUND_CUTOFF_HOURS,
       maxNights: MAX_NIGHTS,
-      mattressNote: 'Chargeable mattresses may be available on request. The Stay Admin will confirm availability and charges directly.',
+      mattressNightlyRate: MATTRESS_NIGHTLY_RATE,
+      mattressNote: 'Extra mattresses cost ₹200 per mattress per night and do not increase the listed room capacity.',
       unitTypes: types.map((type) => this.formatUnitType(type)),
     };
   }
@@ -136,6 +139,7 @@ class StayService {
     const checkOutDate = dateOnly(data.checkOutDate, 'checkOutDate');
     const nightCount = nightsBetween(checkInDate, checkOutDate);
     const requestedItems = this.normalizeRequestedItems(data.items, { allowEmpty: true });
+    const mattressQuantity = Number(data.mattressQuantity || 0);
     const types = await this.currentTypes(trx);
     const typeResults = [];
     let totalAmount = 0;
@@ -167,18 +171,27 @@ class StayService {
     );
     if (unknown) throw new ValidationError(`Unknown or inactive unit type: ${unknown.unitTypeCode}`);
 
+    const mattressTotal = calculateLineTotal(
+      MATTRESS_NIGHTLY_RATE,
+      mattressQuantity,
+      nightCount
+    );
     return {
       checkInDate,
       checkOutDate,
       nightCount,
-      totalAmount: money(totalAmount),
+      accommodationAmount: money(totalAmount),
+      mattressQuantity,
+      mattressNightlyRate: MATTRESS_NIGHTLY_RATE,
+      mattressTotal,
+      totalAmount: money(totalAmount + mattressTotal),
       totalCapacity,
       currency: 'INR',
       pricesIncludeTaxes: true,
       canFulfill: typeResults.every((item) => item.canFulfill),
       availabilityIsInformational: true,
       unitTypes: typeResults,
-      mattressNote: 'Chargeable mattresses may be available on request. The Stay Admin will confirm availability and charges directly.',
+      mattressNote: 'Extra mattresses cost ₹200 per mattress per night and do not increase the listed room capacity.',
     };
   }
 
@@ -205,6 +218,7 @@ class StayService {
       }
 
       let totalAmount = 0;
+      const mattressQuantity = Number(data.mattressQuantity || 0);
       const items = requestedItems.map((requested) => {
         const type = types.find((candidate) => candidate.code === requested.unitTypeCode);
         if (requested.quantity > Number(type.total_inventory)) {
@@ -233,6 +247,11 @@ class StayService {
         );
       }
 
+      const mattressTotal = calculateLineTotal(
+        MATTRESS_NIGHTLY_RATE,
+        mattressQuantity,
+        nightCount
+      );
       const [booking] = await trx('stay_bookings').insert({
         reference: bookingReference(now),
         user_id: userId,
@@ -244,8 +263,10 @@ class StayService {
         contact_name: String(data.contactName).trim(),
         contact_email: String(data.contactEmail).trim(),
         contact_phone: String(data.contactPhone).trim(),
-        total_amount: money(totalAmount),
-        mattress_requested: data.mattressRequested === true,
+        total_amount: money(totalAmount + mattressTotal),
+        mattress_quantity: mattressQuantity,
+        mattress_nightly_rate: MATTRESS_NIGHTLY_RATE,
+        mattress_total: mattressTotal,
         customer_note: String(data.customerNote || '').trim() || null,
         cancellation_policy_accepted: true,
       }).returning('*');
@@ -699,7 +720,9 @@ class StayService {
       contactEmail: row.contact_email,
       contactPhone: row.contact_phone,
       totalAmount: money(row.total_amount),
-      mattressRequested: row.mattress_requested,
+      mattressQuantity: Number(row.mattress_quantity),
+      mattressNightlyRate: money(row.mattress_nightly_rate),
+      mattressTotal: money(row.mattress_total),
       customerNote: row.customer_note,
       rejectionReason: row.rejection_reason,
       confirmedAt: row.confirmed_at,
@@ -754,7 +777,9 @@ module.exports.StayService = StayService;
 module.exports.constants = {
   REFUND_CUTOFF_HOURS,
   CHECK_IN_HOUR_IST,
+  CHECK_OUT_HOUR_IST,
   MAX_NIGHTS,
+  MATTRESS_NIGHTLY_RATE,
   UNIT_TYPE_CODES,
   INVENTORY_HOLDING_STATUSES,
   TERMINAL_STATUSES,

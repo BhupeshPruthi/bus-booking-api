@@ -201,6 +201,7 @@ const stayQuoteSchema = Joi.object({
   checkInDate: stayDateSchema,
   checkOutDate: stayDateSchema,
   items: Joi.array().items(stayBookingItemSchema).unique('unitTypeCode').default([]),
+  mattressQuantity: Joi.number().integer().min(0).default(0),
 });
 
 const createStayBookingSchema = stayQuoteSchema.keys({
@@ -210,7 +211,6 @@ const createStayBookingSchema = stayQuoteSchema.keys({
   contactEmail: Joi.string().email().max(320).lowercase().trim().required(),
   contactPhone: Joi.string().pattern(/^[0-9+ -]{7,20}$/).trim().required(),
   cancellationPolicyAccepted: Joi.boolean().valid(true).required(),
-  mattressRequested: Joi.boolean().default(false),
   customerNote: Joi.string().max(1000).allow('', null).trim(),
 });
 

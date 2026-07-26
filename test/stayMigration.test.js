@@ -11,6 +11,8 @@ const migration = fs.readFileSync(
 test('Stay migration uses aggregate inventory and immutable rate history', () => {
   assert.match(migration, /total_inventory/);
   assert.match(migration, /stay_rate_history/);
+  assert.match(migration, /mattress_nightly_rate/);
+  assert.match(migration, /defaultTo\(200\)/);
   assert.doesNotMatch(migration, /createTable\('stay_units'/);
   assert.doesNotMatch(migration, /stay_booking_unit_assignments/);
 });

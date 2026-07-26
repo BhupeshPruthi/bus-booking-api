@@ -11,11 +11,15 @@ const {
   nightsBetween,
   databaseDateOnly,
   checkInInstant,
+  checkoutInstant,
   calculateLineTotal,
   calculateGuestCapacity,
   refundEligibility,
 } = require('../src/services/stayService').helpers;
-const { INVENTORY_HOLDING_STATUSES } = require('../src/services/stayService').constants;
+const {
+  INVENTORY_HOLDING_STATUSES,
+  MATTRESS_NIGHTLY_RATE,
+} = require('../src/services/stayService').constants;
 const {
   stayCancellationDecisionSchema,
   createStayBookingSchema,
@@ -83,8 +87,9 @@ test('Stay nights use checkout-exclusive calendar dates', () => {
   );
 });
 
-test('Stay check-in instant is 11 AM India time', () => {
-  assert.equal(checkInInstant('2026-08-01').toISOString(), '2026-08-01T05:30:00.000Z');
+test('Stay check-in is noon and checkout is 11 AM India time', () => {
+  assert.equal(checkInInstant('2026-08-01').toISOString(), '2026-08-01T06:30:00.000Z');
+  assert.equal(checkoutInstant('2026-08-02').toISOString(), '2026-08-02T05:30:00.000Z');
 });
 
 test('PostgreSQL DATE values retain their calendar date', () => {
@@ -98,6 +103,11 @@ test('Stay prices are inclusive per unit per night totals', () => {
   assert.equal(calculateLineTotal(1500, 1, 1), 1500);
   assert.equal(calculateLineTotal(1600, 1, 2), 3200);
   assert.equal(calculateLineTotal(3500, 3, 1), 10500);
+});
+
+test('mattresses cost ₹200 each per night', () => {
+  assert.equal(MATTRESS_NIGHTLY_RATE, 200);
+  assert.equal(calculateLineTotal(MATTRESS_NIGHTLY_RATE, 3, 2), 1200);
 });
 
 test('Stay guest capacity is derived from the selected accommodation', () => {
@@ -129,9 +139,9 @@ test('Stay duration is capped at exactly seven nights', () => {
   );
 });
 
-test('refund eligibility uses request time and exact 11 AM check-in cutoff', () => {
-  const exactly48Hours = new Date('2026-07-30T05:30:00.000Z');
-  const oneSecondLate = new Date('2026-07-30T05:30:01.000Z');
+test('refund eligibility uses request time and exact noon check-in cutoff', () => {
+  const exactly48Hours = new Date('2026-07-30T06:30:00.000Z');
+  const oneSecondLate = new Date('2026-07-30T06:30:01.000Z');
 
   assert.equal(
     refundEligibility('2026-08-01', exactly48Hours).standardFullRefundEligible,
