@@ -110,6 +110,31 @@ test('mattresses cost ₹200 each per night', () => {
   assert.equal(calculateLineTotal(MATTRESS_NIGHTLY_RATE, 3, 2), 1200);
 });
 
+test('Stay mattress quantity is capped at 100 per booking', () => {
+  const baseBooking = {
+    checkInDate: '2026-08-01',
+    checkOutDate: '2026-08-02',
+    items: [{ unitTypeCode: 'three_bed_room', quantity: 1 }],
+    guestCount: 1,
+    contactName: 'Guest',
+    contactEmail: 'guest@example.com',
+    contactPhone: '9999999999',
+    cancellationPolicyAccepted: true,
+  };
+
+  assert.equal(createStayBookingSchema.validate({
+    ...baseBooking,
+    mattressQuantity: 100,
+  }).error, undefined);
+  assert.match(
+    createStayBookingSchema.validate({
+      ...baseBooking,
+      mattressQuantity: 101,
+    }).error?.message || '',
+    /less than or equal to 100/
+  );
+});
+
 test('Stay guest capacity is derived from the selected accommodation', () => {
   assert.equal(calculateGuestCapacity([
     { capacity_per_unit: 3, quantity: 2 },

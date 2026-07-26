@@ -34,6 +34,14 @@ test('unified feed uses each domain end boundary', () => {
   assert.match(migration, /INTERVAL '8 hours'/);
 });
 
+test('unified feed preserves Stay timestamptz audit columns', () => {
+  const stayBranch = migration.split("'stay'::text AS booking_type")[1]
+    .split('UNION ALL')[0];
+  assert.match(stayBranch, /booking\.created_at AS created_at/);
+  assert.match(stayBranch, /booking\.updated_at AS updated_at/);
+  assert.doesNotMatch(stayBranch, /booking\.(created_at|updated_at) AT TIME ZONE/);
+});
+
 test('unified booking cursor round trips safely', () => {
   const row = {
     starts_at: '2026-08-01T06:30:00.000Z',
