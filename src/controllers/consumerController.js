@@ -3,6 +3,7 @@ const bookingService = require('../services/bookingService');
 const poojaService = require('../services/poojaService');
 const eventService = require('../services/eventService');
 const eventImageStorageService = require('../services/eventImageStorageService');
+const unifiedBookingService = require('../services/unifiedBookingService');
 const asyncHandler = require('../utils/asyncHandler');
 const { getApiBaseUrl } = require('../utils/requestBaseUrl');
 
@@ -75,6 +76,20 @@ const getMyBookings = asyncHandler(async (req, res) => {
   res.json({ success: true, data: result });
 });
 
+const getUnifiedBookings = asyncHandler(async (req, res) => {
+  const result = await unifiedBookingService.list(req.user.id, req.query);
+  res.json({ success: true, data: result });
+});
+
+const getUnifiedBooking = asyncHandler(async (req, res) => {
+  const result = await unifiedBookingService.getById(
+    req.user.id,
+    req.params.bookingType,
+    req.params.bookingId
+  );
+  res.json({ success: true, data: result });
+});
+
 const getBookingById = asyncHandler(async (req, res) => {
   const result = await bookingService.getBookingById(req.params.id, req.user.id);
   res.json({ success: true, data: result });
@@ -100,6 +115,8 @@ module.exports = {
   getEventImage,
   createBooking,
   getMyBookings,
+  getUnifiedBookings,
+  getUnifiedBooking,
   getBookingById,
   requestBookingCancellation,
 };

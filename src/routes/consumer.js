@@ -7,6 +7,8 @@ const {
   createBookingSchema,
   cancellationRequestSchema,
   bookPoojaTokenSchema,
+  unifiedBookingListSchema,
+  unifiedBookingDetailSchema,
 } = require('../validators/schemas');
 
 const router = express.Router();
@@ -78,6 +80,20 @@ router.post(
  * @access Consumer
  */
 router.get('/bookings', authenticate, consumerController.getMyBookings);
+
+router.get(
+  '/me/bookings',
+  authenticate,
+  validate(unifiedBookingListSchema, 'query'),
+  consumerController.getUnifiedBookings
+);
+
+router.get(
+  '/me/bookings/:bookingType/:bookingId',
+  authenticate,
+  validate(unifiedBookingDetailSchema, 'params'),
+  consumerController.getUnifiedBooking
+);
 
 /**
  * @route GET /api/bookings/:id

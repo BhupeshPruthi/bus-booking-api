@@ -232,6 +232,20 @@ const stayCancellationSchema = Joi.object({
   reason: Joi.string().max(1000).allow('', null).trim(),
 });
 
+const unifiedBookingListSchema = Joi.object({
+  bucket: Joi.string().valid('upcoming', 'past', 'failed').default('upcoming'),
+  types: Joi.string()
+    .pattern(/^(bus|stay|pooja)(,(bus|stay|pooja))*$/)
+    .default('bus,stay,pooja'),
+  cursor: Joi.string().max(1000),
+  limit: Joi.number().integer().min(1).max(50).default(20),
+});
+
+const unifiedBookingDetailSchema = Joi.object({
+  bookingType: Joi.string().valid('bus', 'stay', 'pooja').required(),
+  bookingId: uuidSchema,
+});
+
 const stayCancellationListSchema = Joi.object({
   status: Joi.string().valid('pending', 'approved', 'rejected'),
 }).concat(paginationSchema);
@@ -333,6 +347,8 @@ module.exports = {
   stayQuoteSchema,
   createStayBookingSchema,
   stayBookingListSchema,
+  unifiedBookingListSchema,
+  unifiedBookingDetailSchema,
   stayCancellationSchema,
   stayCancellationListSchema,
   stayRejectionSchema,
