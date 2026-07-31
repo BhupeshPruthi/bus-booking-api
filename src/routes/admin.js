@@ -23,6 +23,7 @@ const {
   stayCancellationListSchema,
   stayRejectionSchema,
   stayCancellationDecisionSchema,
+  createStayCouponSchema,
   feedbackListSchema,
 } = require('../validators/schemas');
 
@@ -137,6 +138,19 @@ router.get(
 );
 
 // ============ STAY ADMIN ============
+
+router.get('/stay/coupons', stayAdminOrSuperUser, stayAdminController.getCoupons);
+router.post(
+  '/stay/coupons',
+  stayAdminOrSuperUser,
+  validate(createStayCouponSchema),
+  stayAdminController.createCoupon
+);
+router.post(
+  '/stay/coupons/:id/deactivate',
+  stayAdminOrSuperUser,
+  stayAdminController.deactivateCoupon
+);
 
 router.get(
   '/stay/bookings',

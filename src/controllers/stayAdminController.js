@@ -1,4 +1,5 @@
 const stayService = require('../services/stayService');
+const stayCouponService = require('../services/stayCouponService');
 const asyncHandler = require('../utils/asyncHandler');
 
 const getBookings = asyncHandler(async (req, res) => {
@@ -25,6 +26,16 @@ const decideCancellation = asyncHandler(async (req, res) => {
     data: await stayService.decideCancellation(req.params.id, req.user.id, req.body),
   });
 });
+const getCoupons = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: await stayCouponService.list() });
+});
+const createCoupon = asyncHandler(async (req, res) => {
+  const coupon = await stayCouponService.create(req.user.id, req.body);
+  res.status(201).json({ success: true, data: coupon });
+});
+const deactivateCoupon = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: await stayCouponService.deactivate(req.params.id) });
+});
 module.exports = {
   getBookings,
   getBooking,
@@ -32,4 +43,7 @@ module.exports = {
   rejectBooking,
   getCancellations,
   decideCancellation,
+  getCoupons,
+  createCoupon,
+  deactivateCoupon,
 };

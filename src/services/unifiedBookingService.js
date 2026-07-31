@@ -163,7 +163,22 @@ class UnifiedBookingService {
       })
       .first();
     if (!row) throw new NotFoundError('Booking');
-    return formatItem(row);
+    const result = formatItem(row);
+    if (bookingType === 'stay') {
+      const pricing = await db('stay_bookings')
+        .select('subtotal_amount', 'discount_amount', 'coupon_code')
+        .where({ id: bookingId, user_id: userId })
+        .first();
+      if (pricing) {
+        result.details = {
+          ...result.details,
+          subtotalAmount: Number(pricing.subtotal_amount),
+          discountAmount: Number(pricing.discount_amount || 0),
+          couponCode: pricing.coupon_code || null,
+        };
+      }
+    }
+    return result;
   }
 }
 

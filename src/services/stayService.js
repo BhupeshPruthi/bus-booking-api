@@ -1,5 +1,6 @@
 const crypto = require('node:crypto');
 const { db } = require('../config/database');
+const stayCouponService = require('./stayCouponService');
 const {
   NotFoundError,
   ValidationError,
@@ -160,12 +161,22 @@ class StayService {
     );
     if (unknown) throw new ValidationError(`Unknown or inactive unit type: ${unknown.unitTypeCode}`);
 
+    const subtotalAmount = money(totalAmount);
+    const couponPricing = await stayCouponService.apply(
+      data.couponCode,
+      subtotalAmount,
+      trx
+    );
+
     return {
       checkInDate,
       checkOutDate,
       nightCount,
-      accommodationAmount: money(totalAmount),
-      totalAmount: money(totalAmount),
+      accommodationAmount: subtotalAmount,
+      subtotalAmount,
+      discountAmount: couponPricing.discountAmount,
+      couponCode: couponPricing.couponCode,
+      totalAmount: couponPricing.totalAmount,
       totalCapacity,
       currency: 'INR',
       pricesIncludeTaxes: true,
@@ -218,6 +229,13 @@ class StayService {
         };
       });
       const guestCount = Number(data.guestCount);
+      const subtotalAmount = money(totalAmount);
+      const couponPricing = await stayCouponService.apply(
+        data.couponCode,
+        subtotalAmount,
+        trx,
+        now
+      );
 
       const [booking] = await trx('stay_bookings').insert({
         reference: bookingReference(now),
@@ -230,7 +248,11 @@ class StayService {
         contact_name: String(data.contactName).trim(),
         contact_email: String(data.contactEmail).trim(),
         contact_phone: String(data.contactPhone).trim(),
-        total_amount: money(totalAmount),
+        subtotal_amount: subtotalAmount,
+        discount_amount: couponPricing.discountAmount,
+        coupon_id: couponPricing.couponId,
+        coupon_code: couponPricing.couponCode,
+        total_amount: couponPricing.totalAmount,
         customer_note: String(data.customerNote || '').trim() || null,
         cancellation_policy_accepted: true,
       }).returning('*');
@@ -607,6 +629,9 @@ class StayService {
       contactName: row.contact_name,
       contactEmail: row.contact_email,
       contactPhone: row.contact_phone,
+      subtotalAmount: money(row.subtotal_amount ?? row.total_amount),
+      discountAmount: money(row.discount_amount || 0),
+      couponCode: row.coupon_code || null,
       totalAmount: money(row.total_amount),
       customerNote: row.customer_note,
       rejectionReason: row.rejection_reason,

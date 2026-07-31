@@ -212,6 +212,7 @@ const stayQuoteSchema = Joi.object({
   checkInDate: stayDateSchema,
   checkOutDate: stayDateSchema,
   items: Joi.array().items(stayBookingItemSchema).unique('unitTypeCode').default([]),
+  couponCode: Joi.string().uppercase().trim().max(50).pattern(/^[A-Z0-9_-]+$/).allow('', null),
 });
 
 const createStayBookingSchema = stayQuoteSchema.keys({
@@ -282,6 +283,19 @@ const stayCancellationDecisionSchema = Joi.object({
     otherwise: Joi.string().max(1000).allow('', null).trim(),
   }),
 });
+
+const createStayCouponSchema = Joi.object({
+  code: Joi.string().uppercase().trim().min(3).max(50)
+    .pattern(/^[A-Z0-9_-]+$/).required(),
+  discountAmount: Joi.number().positive().precision(2).max(9999999999.99).required(),
+  startDate: stayDateSchema,
+  endDate: stayDateSchema,
+}).custom((value, helpers) => {
+  if (value.endDate < value.startDate) {
+    return helpers.error('any.custom', { message: 'End date cannot be before start date' });
+  }
+  return value;
+}).messages({ 'any.custom': '{{#message}}' });
 
 // ============ EVENTS SCHEMAS ============
 
@@ -355,6 +369,7 @@ module.exports = {
   stayCancellationListSchema,
   stayRejectionSchema,
   stayCancellationDecisionSchema,
+  createStayCouponSchema,
 
   // Events
   createEventSchema,
