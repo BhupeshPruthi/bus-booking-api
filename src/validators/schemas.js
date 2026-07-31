@@ -22,6 +22,17 @@ const refreshTokenSchema = Joi.object({
   refreshToken: Joi.string().required(),
 });
 
+// ============ FEEDBACK SCHEMAS ============
+
+const createFeedbackSchema = Joi.object({
+  message: Joi.string().trim().min(1).max(2000).required(),
+});
+
+const feedbackListSchema = Joi.object({
+  page: Joi.number().integer().min(1).default(1),
+  limit: Joi.number().integer().min(1).max(100).default(20),
+});
+
 // ============ PROFILE SCHEMAS ============
 
 const updateProfileSchema = Joi.object({
@@ -299,6 +310,10 @@ module.exports = {
   // Auth
   googleSignInSchema,
   refreshTokenSchema,
+
+  // Feedback
+  createFeedbackSchema,
+  feedbackListSchema,
 
   // Profile
   updateProfileSchema,

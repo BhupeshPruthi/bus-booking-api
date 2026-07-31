@@ -1,5 +1,6 @@
 const express = require('express');
 const consumerController = require('../controllers/consumerController');
+const feedbackController = require('../controllers/feedbackController');
 const { authenticate } = require('../middlewares/authenticate');
 const validate = require('../middlewares/validate');
 const {
@@ -9,6 +10,7 @@ const {
   bookPoojaTokenSchema,
   unifiedBookingListSchema,
   unifiedBookingDetailSchema,
+  createFeedbackSchema,
 } = require('../validators/schemas');
 
 const router = express.Router();
@@ -61,6 +63,18 @@ router.get('/events', consumerController.getUpcomingEvents);
  * @access Public
  */
 router.get('/events/images/:imageName', consumerController.getEventImage);
+
+/**
+ * @route POST /api/feedback
+ * @desc Submit feedback associated with the signed-in user
+ * @access Authenticated user
+ */
+router.post(
+  '/feedback',
+  authenticate,
+  validate(createFeedbackSchema),
+  feedbackController.create
+);
 
 /**
  * @route POST /api/bookings

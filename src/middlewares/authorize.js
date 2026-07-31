@@ -56,6 +56,25 @@ const eventAdminOrSuperUser = requireCapability(
   CAPABILITIES.EVENT_MANAGE,
   'Access denied. Bus Admin or Super Admin required.'
 );
+
+const anyAdminOrSuperUser = async (req, res, next) => {
+  if (!req.user) {
+    return next(new UnauthorizedError('User not authenticated'));
+  }
+
+  try {
+    const user = await sessionService.getCurrentUser(req.user.id);
+    if (!normalizeAdminType(user)) {
+      logDenial(req, user, 'admin');
+      return next(new ForbiddenError('Access denied. Admin access required.'));
+    }
+    req.user = { ...req.user, ...user };
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Legacy export remains mapped to Bus/Pooja access so any route not yet migrated
 // cannot accidentally grant Stay Admin access to existing operations.
 const adminOrSuperUser = busAdminOrSuperUser;
@@ -66,5 +85,6 @@ module.exports = {
   poojaAdminOrSuperUser,
   stayAdminOrSuperUser,
   eventAdminOrSuperUser,
+  anyAdminOrSuperUser,
   adminOrSuperUser,
 };

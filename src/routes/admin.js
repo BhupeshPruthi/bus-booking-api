@@ -1,12 +1,14 @@
 const express = require('express');
 const adminController = require('../controllers/adminController');
 const stayAdminController = require('../controllers/stayAdminController');
+const feedbackController = require('../controllers/feedbackController');
 const { authenticate } = require('../middlewares/authenticate');
 const {
   busAdminOrSuperUser,
   poojaAdminOrSuperUser,
   eventAdminOrSuperUser,
   stayAdminOrSuperUser,
+  anyAdminOrSuperUser,
 } = require('../middlewares/authorize');
 const { eventImageUpload, handleMulterError } = require('../middlewares/upload');
 const validate = require('../middlewares/validate');
@@ -21,6 +23,7 @@ const {
   stayCancellationListSchema,
   stayRejectionSchema,
   stayCancellationDecisionSchema,
+  feedbackListSchema,
 } = require('../validators/schemas');
 
 const router = express.Router();
@@ -119,6 +122,18 @@ router.post(
   busAdminOrSuperUser,
   validate(adminCancelBookingSchema),
   adminController.cancelBooking
+);
+
+/**
+ * @route GET /api/admin/feedback
+ * @desc List feedback with submitter contact details
+ * @access Any Admin
+ */
+router.get(
+  '/feedback',
+  anyAdminOrSuperUser,
+  validate(feedbackListSchema, 'query'),
+  feedbackController.list
 );
 
 // ============ STAY ADMIN ============
