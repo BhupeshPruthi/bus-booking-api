@@ -15,6 +15,10 @@ const bookingFeedMigration = fs.readFileSync(
   path.join(__dirname, '../src/db/migrations/20260726000029_create_user_booking_feed.js'),
   'utf8'
 );
+const stayService = fs.readFileSync(
+  path.join(__dirname, '../src/services/stayService.js'),
+  'utf8'
+);
 
 test('Stay migration uses aggregate inventory and immutable rate history', () => {
   assert.match(migration, /total_inventory/);
@@ -37,8 +41,10 @@ test('Stay migration preserves existing Bus, Pooja, and Event admins', () => {
   assert.match(migration, /'bus_admin', 'stay_admin', 'super_admin'/);
 });
 
-test('Stay migration retains status and admin action history indefinitely', () => {
+test('Stay migration retains booking status and role history indefinitely', () => {
   assert.match(migration, /stay_booking_status_history/);
-  assert.match(migration, /stay_admin_actions/);
+  assert.doesNotMatch(migration, /stay_admin_actions/);
+  assert.doesNotMatch(stayService, /stay_admin_actions/);
+  assert.doesNotMatch(stayService, /logAction\(/);
   assert.match(migration, /admin_role_history/);
 });

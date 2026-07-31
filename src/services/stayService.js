@@ -291,7 +291,6 @@ class StayService {
         updated_at: now,
       });
       await this.recordStatus(trx, bookingId, 'pending', 'confirmed', adminId, 'Confirmed by Stay Admin');
-      await this.logAction(trx, adminId, bookingId, 'booking_confirmed');
     });
     return this.getBookingById(bookingId);
   }
@@ -312,7 +311,6 @@ class StayService {
         updated_at: now,
       });
       await this.recordStatus(trx, bookingId, 'pending', 'rejected', adminId, reason);
-      await this.logAction(trx, adminId, bookingId, 'booking_rejected', { reason });
     });
     return this.getBookingById(bookingId);
   }
@@ -406,9 +404,6 @@ class StayService {
           adminId,
           data.reason
         );
-        await this.logAction(trx, adminId, booking.id, 'cancellation_rejected', {
-          reason: data.reason,
-        });
         return;
       }
 
@@ -449,11 +444,6 @@ class StayService {
         adminId,
         data.reason || `Refund: ${decision}`
       );
-      await this.logAction(trx, adminId, booking.id, 'cancellation_approved', {
-        refundDecision: decision,
-        refundAmount,
-        reason: data.reason || null,
-      });
     });
     return this.getBookingById(bookingId);
   }
@@ -645,15 +635,6 @@ class StayService {
       to_status: toStatus,
       changed_by: changedBy,
       reason: String(reason || '').trim() || null,
-    });
-  }
-
-  async logAction(trx, adminId, bookingId, action, details = {}) {
-    await trx('stay_admin_actions').insert({
-      admin_id: adminId,
-      booking_id: bookingId,
-      action,
-      details: JSON.stringify(details),
     });
   }
 

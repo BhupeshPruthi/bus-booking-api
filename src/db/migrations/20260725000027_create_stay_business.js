@@ -140,17 +140,6 @@ exports.up = async function (knex) {
     table.index(['booking_id', 'created_at']);
   });
 
-  await knex.schema.createTable('stay_admin_actions', (table) => {
-    table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
-    table.uuid('admin_id').nullable().references('id').inTable('users').onDelete('SET NULL');
-    table.uuid('booking_id').nullable().references('id').inTable('stay_bookings').onDelete('SET NULL');
-    table.string('action', 80).notNullable();
-    table.jsonb('details').notNullable().defaultTo('{}');
-    table.timestamp('created_at', { useTz: true }).notNullable().defaultTo(knex.fn.now());
-    table.index(['booking_id', 'created_at']);
-    table.index(['admin_id', 'created_at']);
-  });
-
   await knex.schema.createTable('admin_role_history', (table) => {
     table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
     table.uuid('user_id').notNullable().references('id').inTable('users').onDelete('CASCADE');
@@ -190,7 +179,6 @@ exports.up = async function (knex) {
  */
 exports.down = async function (knex) {
   await knex.schema.dropTableIfExists('admin_role_history');
-  await knex.schema.dropTableIfExists('stay_admin_actions');
   await knex.schema.dropTableIfExists('stay_booking_status_history');
   await knex.schema.dropTableIfExists('stay_cancellation_requests');
   await knex.schema.dropTableIfExists('stay_booking_items');
