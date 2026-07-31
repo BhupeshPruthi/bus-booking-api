@@ -156,7 +156,8 @@ request, so a role change takes effect immediately.
 Stay uses aggregate inventory rather than numbered rooms. Pending requests do
 not reserve inventory; confirmation atomically checks availability. Prices
 include taxes, and each request stores an immutable price snapshot. Check-in is
-12:00 noon IST and checkout is 11:00 AM IST.
+12:00 noon IST and checkout is 11:00 AM IST. Customers can cancel pending Stay
+requests immediately; cancellations after confirmation require Admin approval.
 
 ## CI
 

@@ -82,6 +82,16 @@ function refundEligibility(checkInDate, requestedAt = new Date()) {
   };
 }
 
+function cancellationTransition(status) {
+  if (status === 'pending') {
+    return { bookingStatus: 'cancelled', requestStatus: 'approved' };
+  }
+  if (status === 'confirmed') {
+    return { bookingStatus: 'cancellation_requested', requestStatus: 'pending' };
+  }
+  return null;
+}
+
 function bookingReference(now = new Date()) {
   const day = now.toISOString().slice(0, 10).replaceAll('-', '');
   return `STAY-${day}-${crypto.randomBytes(6).toString('hex').toUpperCase()}`;
@@ -316,7 +326,8 @@ class StayService {
         .forUpdate()
         .first();
       if (!booking) throw new NotFoundError('Stay booking');
-      if (!['pending', 'confirmed'].includes(booking.status)) {
+      const transition = cancellationTransition(booking.status);
+      if (!transition) {
         throw new ValidationError(`Cannot request cancellation with status: ${booking.status}`);
       }
       const checkInDate = databaseDateOnly(booking.check_in_date, 'check_in_date');
@@ -325,26 +336,33 @@ class StayService {
         throw new ValidationError('Cancellation cannot be requested after check-in has started');
       }
       const eligibility = refundEligibility(checkInDate, now);
+      const isImmediate = transition.bookingStatus === 'cancelled';
       const [request] = await trx('stay_cancellation_requests').insert({
         booking_id: booking.id,
-        status: 'pending',
+        status: transition.requestStatus,
         previous_booking_status: booking.status,
         reason: String(reason || '').trim() || null,
         requested_at: now,
         standard_full_refund_eligible: eligibility.standardFullRefundEligible,
         hours_before_check_in: eligibility.hoursBeforeCheckIn,
+        refund_decision: isImmediate ? 'none' : null,
+        refund_amount: isImmediate ? 0 : null,
+        decision_reason: isImmediate ? 'Cancelled before admin approval' : null,
+        decided_at: isImmediate ? now : null,
       }).returning('*');
       await trx('stay_bookings').where('id', booking.id).update({
-        status: 'cancellation_requested',
+        status: transition.bookingStatus,
         updated_at: now,
       });
       await this.recordStatus(
         trx,
         booking.id,
         booking.status,
-        'cancellation_requested',
+        transition.bookingStatus,
         userId,
-        reason || 'Customer requested cancellation'
+        reason || (isImmediate
+          ? 'Customer cancelled before admin approval'
+          : 'Customer requested cancellation')
       );
       return request.id;
     });
@@ -752,5 +770,6 @@ module.exports.helpers = {
   checkoutInstant,
   money,
   calculateLineTotal,
+  cancellationTransition,
   refundEligibility,
 };

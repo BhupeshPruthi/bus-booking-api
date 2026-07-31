@@ -13,6 +13,7 @@ const {
   checkInInstant,
   checkoutInstant,
   calculateLineTotal,
+  cancellationTransition,
   refundEligibility,
 } = require('../src/services/stayService').helpers;
 const {
@@ -74,6 +75,18 @@ test('Bus Admin retains Event access while Stay Admin remains isolated', () => {
 test('only confirmed inventory, including confirmed cancellation requests, is held', () => {
   assert.deepEqual(INVENTORY_HOLDING_STATUSES, ['confirmed', 'cancellation_requested']);
   assert.equal(INVENTORY_HOLDING_STATUSES.includes('pending'), false);
+});
+
+test('pending Stay requests cancel immediately while confirmed bookings require admin review', () => {
+  assert.deepEqual(cancellationTransition('pending'), {
+    bookingStatus: 'cancelled',
+    requestStatus: 'approved',
+  });
+  assert.deepEqual(cancellationTransition('confirmed'), {
+    bookingStatus: 'cancellation_requested',
+    requestStatus: 'pending',
+  });
+  assert.equal(cancellationTransition('cancelled'), null);
 });
 
 test('Stay nights use checkout-exclusive calendar dates', () => {
