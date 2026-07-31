@@ -1,6 +1,7 @@
 const express = require('express');
 const consumerController = require('../controllers/consumerController');
 const feedbackController = require('../controllers/feedbackController');
+const helpContactController = require('../controllers/helpContactController');
 const { authenticate } = require('../middlewares/authenticate');
 const validate = require('../middlewares/validate');
 const {
@@ -63,6 +64,13 @@ router.get('/events', consumerController.getUpcomingEvents);
  * @access Public
  */
 router.get('/events/images/:imageName', consumerController.getEventImage);
+
+/**
+ * @route GET /api/help-contacts
+ * @desc Get active Help contacts
+ * @access Public
+ */
+router.get('/help-contacts', helpContactController.list);
 
 /**
  * @route POST /api/feedback

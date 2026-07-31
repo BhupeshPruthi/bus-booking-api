@@ -6,6 +6,10 @@ const {
   feedbackListSchema,
 } = require('../src/validators/schemas');
 const { formatFeedback } = require('../src/services/feedbackService');
+const {
+  list: listHelpContacts,
+  formatHelpContact,
+} = require('../src/services/helpContactService');
 const { normalizeAdminType, ADMIN_TYPES } = require('../src/services/adminCapabilityService');
 
 test('feedback requires a non-empty message and trims it', () => {
@@ -62,4 +66,62 @@ test('all existing admin types qualify for the shared feedback list', () => {
     ADMIN_TYPES.SUPER
   );
   assert.equal(normalizeAdminType({ role: 'consumer' }), null);
+});
+
+test('Help contacts expose only the fields needed by the app', () => {
+  assert.deepEqual(formatHelpContact({
+    id: 'contact-id',
+    category_code: 'emergency',
+    title: 'Emergency',
+    contact_name: 'Bhupesh Pruthi',
+    phone: '9513333839',
+    display_order: 4,
+    is_active: true,
+  }), {
+    id: 'contact-id',
+    code: 'emergency',
+    title: 'Emergency',
+    contactName: 'Bhupesh Pruthi',
+    phone: '9513333839',
+  });
+});
+
+test('Help contacts are loaded from active database rows in display order', async () => {
+  const calls = [];
+  const rows = [{
+    id: 'contact-id',
+    category_code: 'bus',
+    title: 'Bus booking and services',
+    contact_name: 'Bhupesh Pruthi',
+    phone: '9513333839',
+  }];
+  const query = {
+    select(...columns) {
+      calls.push(['select', columns]);
+      return this;
+    },
+    where(column, value) {
+      calls.push(['where', column, value]);
+      return this;
+    },
+    async orderBy(column, direction) {
+      calls.push(['orderBy', column, direction]);
+      return rows;
+    },
+  };
+  const database = (tableName) => {
+    calls.push(['table', tableName]);
+    return query;
+  };
+
+  const result = await listHelpContacts(database);
+
+  assert.deepEqual(calls[0], ['table', 'help_contacts']);
+  assert.ok(calls.some((call) =>
+    call[0] === 'where' && call[1] === 'is_active' && call[2] === true
+  ));
+  assert.ok(calls.some((call) =>
+    call[0] === 'orderBy' && call[1] === 'display_order' && call[2] === 'asc'
+  ));
+  assert.equal(result[0].code, 'bus');
 });
