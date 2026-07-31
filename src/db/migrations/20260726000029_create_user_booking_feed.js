@@ -89,8 +89,6 @@ exports.up = async function (knex) {
         'contactName', booking.contact_name,
         'contactEmail', booking.contact_email,
         'contactPhone', booking.contact_phone,
-        'mattressQuantity', booking.mattress_quantity,
-        'mattressTotal', booking.mattress_total,
         'items', COALESCE(item_summary.items, '[]'::jsonb),
         'rejectionReason', booking.rejection_reason
       ) AS details

@@ -7,40 +7,29 @@ const migration = fs.readFileSync(
   path.join(__dirname, '../src/db/migrations/20260725000027_create_stay_business.js'),
   'utf8'
 );
-const mattressPricingMigration = fs.readFileSync(
-  path.join(__dirname, '../src/db/migrations/20260726000028_add_stay_mattress_pricing.js'),
+const removeMattressMigration = fs.readFileSync(
+  path.join(__dirname, '../src/db/migrations/20260801000031_remove_stay_mattress.js'),
   'utf8'
 );
-const mattressQuantityConstraintMigration = fs.readFileSync(
-  path.join(__dirname, '../src/db/migrations/20260726000030_bound_stay_mattress_quantity.js'),
+const bookingFeedMigration = fs.readFileSync(
+  path.join(__dirname, '../src/db/migrations/20260726000029_create_user_booking_feed.js'),
   'utf8'
 );
 
 test('Stay migration uses aggregate inventory and immutable rate history', () => {
   assert.match(migration, /total_inventory/);
   assert.match(migration, /stay_rate_history/);
-  assert.match(migration, /mattress_requested/);
   assert.doesNotMatch(migration, /createTable\('stay_units'/);
   assert.doesNotMatch(migration, /stay_booking_unit_assignments/);
 });
 
-test('Stay mattress pricing uses a forward-compatible migration', () => {
-  assert.match(mattressPricingMigration, /hasColumn\(tableName, 'mattress_requested'\)/);
-  assert.match(mattressPricingMigration, /mattress_quantity/);
-  assert.match(mattressPricingMigration, /mattress_nightly_rate/);
-  assert.match(mattressPricingMigration, /defaultTo\(200\)/);
-  assert.match(mattressPricingMigration, /mattress_total/);
-  assert.match(mattressPricingMigration, /dropColumn\('mattress_requested'\)/);
-});
-
-test('Stay mattress quantity is bounded at the database boundary', () => {
-  assert.match(
-    mattressQuantityConstraintMigration,
-    /stay_bookings_mattress_quantity_range_check/
-  );
-  assert.match(mattressQuantityConstraintMigration, /MAX_MATTRESS_QUANTITY = 100/);
-  assert.match(mattressQuantityConstraintMigration, /mattress_quantity >= 0/);
-  assert.match(mattressQuantityConstraintMigration, /mattress_quantity <=/);
+test('Stay mattress storage and feed fields are removed by a forward migration', () => {
+  assert.match(removeMattressMigration, /dropColumns/);
+  assert.match(removeMattressMigration, /mattress_quantity/);
+  assert.match(removeMattressMigration, /mattress_nightly_rate/);
+  assert.match(removeMattressMigration, /mattress_total/);
+  assert.doesNotMatch(bookingFeedMigration, /mattressQuantity/);
+  assert.doesNotMatch(bookingFeedMigration, /mattressTotal/);
 });
 
 test('Stay migration preserves existing Bus, Pooja, and Event admins', () => {

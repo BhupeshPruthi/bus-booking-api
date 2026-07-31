@@ -190,8 +190,6 @@ const stayDateSchema = Joi.string()
   .required()
   .messages({ 'string.pattern.base': 'Date must use YYYY-MM-DD' });
 
-const MAX_STAY_MATTRESS_QUANTITY = 100;
-
 const stayBookingItemSchema = Joi.object({
   unitTypeCode: Joi.string()
     .valid('three_bed_room', 'four_bed_room', 'five_bed_room', 'hall')
@@ -203,11 +201,6 @@ const stayQuoteSchema = Joi.object({
   checkInDate: stayDateSchema,
   checkOutDate: stayDateSchema,
   items: Joi.array().items(stayBookingItemSchema).unique('unitTypeCode').default([]),
-  mattressQuantity: Joi.number()
-    .integer()
-    .min(0)
-    .max(MAX_STAY_MATTRESS_QUANTITY)
-    .default(0),
 });
 
 const createStayBookingSchema = stayQuoteSchema.keys({

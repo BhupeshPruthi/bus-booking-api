@@ -1,0 +1,136 @@
+package com.mybus.app.data.repository
+
+import com.mybus.app.data.remote.ApiService
+import com.mybus.app.data.remote.dto.*
+import com.squareup.moshi.Moshi
+import kotlinx.coroutines.CancellationException
+import retrofit2.Response
+import java.io.IOException
+import javax.inject.Inject
+import javax.inject.Singleton
+
+@Singleton
+class StayRepository @Inject constructor(
+    private val apiService: ApiService,
+    moshi: Moshi
+) {
+    private val errorAdapter = moshi.adapter(ApiErrorEnvelope::class.java)
+
+    private fun <T> errorMessage(response: Response<ApiResponse<T>>, fallback: String): String {
+        val bodyError = response.body()?.error
+        val rawError = response.errorBody()?.string()
+        val parsedError = rawError
+            ?.takeIf(String::isNotBlank)
+            ?.let { runCatching { errorAdapter.fromJson(it)?.error }.getOrNull() }
+        val apiError = bodyError ?: parsedError
+        val serverMessage = apiError?.message?.trim()
+
+        if (!serverMessage.isNullOrBlank() &&
+            !serverMessage.equals("Internal server error", ignoreCase = true)
+        ) {
+            return serverMessage
+        }
+
+        return when (response.code()) {
+            401 -> "Your session has expired. Please sign in again."
+            403 -> "You do not have permission to perform this Stay action."
+            404 -> "$fallback. The requested Stay information was not found."
+            in 500..599 -> "$fallback because the Stay service had a problem " +
+                "(server error ${response.code()}). Please try again."
+            else -> "$fallback (error ${response.code()}). Please try again."
+        }
+    }
+
+    private suspend fun <T> request(
+        fallback: String,
+        call: suspend () -> Response<ApiResponse<T>>
+    ): Result<T> = try {
+        val response = call()
+        val body = response.body()
+        if (response.isSuccessful && body?.success == true && body.data != null) {
+            Result.success(body.data)
+        } else {
+            Result.failure(Exception(errorMessage(response, fallback)))
+        }
+    } catch (error: CancellationException) {
+        throw error
+    } catch (error: IOException) {
+        Result.failure(Exception("$fallback. Check your internet connection and try again."))
+    } catch (error: Exception) {
+        Result.failure(Exception("$fallback. The server response could not be read. Please try again."))
+    }
+
+    suspend fun getCatalog() = request("Failed to load Stay information") {
+        apiService.getStayCatalog()
+    }
+
+    suspend fun quote(body: StayQuoteRequest) = request("Failed to check availability") {
+        apiService.getStayQuote(body)
+    }
+
+    suspend fun createBooking(body: CreateStayBookingRequest) =
+        request("Failed to submit Stay request") { apiService.createStayBooking(body) }
+
+    suspend fun getMyBookings(page: Int = 1, limit: Int = 50) =
+        request("Failed to load your stays") { apiService.getMyStayBookings(page, limit) }
+
+    suspend fun requestCancellation(id: String, reason: String?) =
+        request("Failed to request cancellation") {
+            apiService.requestStayCancellation(id, StayCancellationRequest(reason))
+        }
+
+    suspend fun getAdminBookings(
+        status: String? = null,
+        search: String? = null,
+        page: Int = 1,
+        limit: Int = 50
+    ) = request("Failed to load Stay bookings") {
+        apiService.getAdminStayBookings(status, search, page, limit)
+    }
+
+    suspend fun confirmBooking(id: String) = request("Failed to confirm booking") {
+        apiService.confirmStayBooking(id)
+    }
+
+    suspend fun rejectBooking(id: String, reason: String) =
+        request("Failed to reject booking") {
+            apiService.rejectStayBooking(id, StayRejectionRequest(reason))
+        }
+
+    suspend fun getCancellationRequests(
+        status: String? = "pending",
+        page: Int = 1,
+        limit: Int = 50
+    ) = request("Failed to load cancellation requests") {
+        apiService.getStayCancellationRequests(status, page, limit)
+    }
+
+    suspend fun decideCancellation(
+        id: String,
+        action: String,
+        refundDecision: String?,
+        refundAmount: Double?,
+        reason: String?
+    ) = request("Failed to process cancellation") {
+        apiService.decideStayCancellation(
+            id,
+            StayCancellationDecisionRequest(action, refundDecision, refundAmount, reason)
+        )
+    }
+
+    suspend fun updateRate(id: String, nightlyRate: Double, note: String?) =
+        request("Failed to update nightly rate") {
+            apiService.updateStayUnitType(
+                id,
+                UpdateStayUnitTypeRequest(nightlyRate, note)
+            )
+        }
+
+    suspend fun getAdminUsers(search: String? = null, page: Int = 1, limit: Int = 50) =
+        request("Failed to load users") { apiService.getAdminUsers(search, page, limit) }
+
+    suspend fun updateAdminType(id: String, adminType: String, reason: String) =
+        request("Failed to update admin access") {
+            apiService.updateAdminType(id, UpdateAdminTypeRequest(adminType, reason))
+        }
+}

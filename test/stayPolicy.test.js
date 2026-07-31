@@ -13,12 +13,10 @@ const {
   checkInInstant,
   checkoutInstant,
   calculateLineTotal,
-  calculateGuestCapacity,
   refundEligibility,
 } = require('../src/services/stayService').helpers;
 const {
   INVENTORY_HOLDING_STATUSES,
-  MATTRESS_NIGHTLY_RATE,
 } = require('../src/services/stayService').constants;
 const {
   stayCancellationDecisionSchema,
@@ -105,41 +103,18 @@ test('Stay prices are inclusive per unit per night totals', () => {
   assert.equal(calculateLineTotal(3500, 3, 1), 10500);
 });
 
-test('mattresses cost ₹200 each per night', () => {
-  assert.equal(MATTRESS_NIGHTLY_RATE, 200);
-  assert.equal(calculateLineTotal(MATTRESS_NIGHTLY_RATE, 3, 2), 1200);
-});
-
-test('Stay mattress quantity is capped at 100 per booking', () => {
-  const baseBooking = {
+test('Stay requests may exceed listed room capacity for admin review', () => {
+  const result = createStayBookingSchema.validate({
     checkInDate: '2026-08-01',
     checkOutDate: '2026-08-02',
     items: [{ unitTypeCode: 'three_bed_room', quantity: 1 }],
-    guestCount: 1,
+    guestCount: 10,
     contactName: 'Guest',
     contactEmail: 'guest@example.com',
     contactPhone: '9999999999',
     cancellationPolicyAccepted: true,
-  };
-
-  assert.equal(createStayBookingSchema.validate({
-    ...baseBooking,
-    mattressQuantity: 100,
-  }).error, undefined);
-  assert.match(
-    createStayBookingSchema.validate({
-      ...baseBooking,
-      mattressQuantity: 101,
-    }).error?.message || '',
-    /less than or equal to 100/
-  );
-});
-
-test('Stay guest capacity is derived from the selected accommodation', () => {
-  assert.equal(calculateGuestCapacity([
-    { capacity_per_unit: 3, quantity: 2 },
-    { capacity_per_unit: 4, quantity: 1 },
-  ]), 10);
+  });
+  assert.equal(result.error, undefined);
 });
 
 test('Stay guest count cannot exceed the PostgreSQL integer range', () => {

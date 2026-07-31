@@ -14,9 +14,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Event
-import androidx.compose.material.icons.filled.EventSeat
+import androidx.compose.material.icons.filled.Luggage
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -41,18 +40,13 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
-import com.mybus.app.data.remote.dto.BookingData
 import com.mybus.app.data.remote.dto.EventListItem
 import com.mybus.app.R
 import com.mybus.app.ui.events.EventsViewModel
 import com.mybus.app.ui.theme.AppOutlinedButtonLabel
-import com.mybus.app.ui.trips.MyTripsViewModel
-import com.mybus.app.ui.util.formatBusScheduleDateTime
-import java.text.NumberFormat
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 private val CardShadowElevation = 6.dp
 private val CardShadowColor = Color(0x40000000) // 25% black – visible on both light & dark
@@ -74,11 +68,8 @@ private fun cardBorder() = BorderStroke(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeTab(
-    isAdmin: Boolean,
-    isLoggedIn: Boolean,
-    onOpenMyTrips: () -> Unit,
-    /** Opens booking detail for a specific trip (home upcoming cards). */
-    onOpenBookingDetail: (bookingId: String) -> Unit,
+    canManageEvents: Boolean,
+    onOpenMyBookings: () -> Unit,
     onAddEventClick: () -> Unit,
     onOpenProfile: () -> Unit,
     /** Opens live events page in-app (upcoming event card). */
@@ -95,15 +86,11 @@ fun HomeTab(
         ) {
             UpcomingEventsSection(onOpenLiveEvents = onOpenLiveEvents)
 
-            UpcomingTripsSection(
-                isLoggedIn = isLoggedIn,
-                onOpenMyTrips = onOpenMyTrips,
-                onOpenBookingDetail = onOpenBookingDetail
-            )
+            MyBookingsSection(onOpenMyBookings = onOpenMyBookings)
 
             GalleryHomeSection()
 
-            if (isAdmin) {
+            if (canManageEvents) {
                 ActionCard(
                     icon = Icons.Filled.Event,
                     title = "Add Event",
@@ -320,308 +307,15 @@ private fun formatEventDate(isoString: String): String {
 }
 
 @Composable
-private fun UpcomingTripsSection(
-    isLoggedIn: Boolean,
-    onOpenMyTrips: () -> Unit,
-    onOpenBookingDetail: (String) -> Unit
+private fun MyBookingsSection(
+    onOpenMyBookings: () -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SectionHeader(
-            title = "Upcoming Trips",
-            onClick = onOpenMyTrips,
-            showTrailingIcon = false
-        )
-
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .cardShadow(RoundedCornerShape(20.dp))
-                .clickable(onClick = onOpenMyTrips),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-            border = cardBorder(),
-            shape = RoundedCornerShape(20.dp)
-        ) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    text = "Let's embark on our spiritual journey together.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "Click here to see your Trips",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun GuestUpcomingTripsBody(
-    onOpenMyTrips: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .cardShadow(RoundedCornerShape(20.dp)),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        border = cardBorder(),
-        shape = RoundedCornerShape(20.dp)
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(
-                text = "Login to view your upcoming trips.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            AppOutlinedButtonLabel(text = "Login", onClick = onOpenMyTrips)
-        }
-    }
-}
-
-@Composable
-private fun UpcomingTripsBody(
-    isLoading: Boolean,
-    error: String?,
-    upcoming: List<BookingData>,
-    onRetry: () -> Unit,
-    onOpenBookingDetail: (String) -> Unit
-) {
-    if (isLoading) {
-        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-    }
-
-    when {
-        error != null && upcoming.isEmpty() -> {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .cardShadow(RoundedCornerShape(20.dp)),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                border = cardBorder(),
-                shape = RoundedCornerShape(20.dp)
-            ) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        text = error,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    AppOutlinedButtonLabel(text = "Retry", onClick = onRetry)
-                }
-            }
-        }
-
-        !isLoading && upcoming.isEmpty() -> {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .cardShadow(RoundedCornerShape(20.dp)),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                border = cardBorder(),
-                shape = RoundedCornerShape(20.dp)
-            ) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        text = "No upcoming trips yet.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = "Go to the Bus tab to book a seat.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
-
-        else -> {
-            val sorted = upcoming.sortedBy { b ->
-                parseInstantOrNull(b.bus?.departureTime)?.toEpochMilli() ?: Long.MAX_VALUE
-            }
-            val pagerState = rememberPagerState(pageCount = { sorted.size })
-
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = 2.dp),
-                pageSpacing = 14.dp
-            ) { page ->
-                val booking = sorted[page]
-                UpcomingTripCard(
-                    booking = booking,
-                    onBookingClick = { onOpenBookingDetail(booking.id) },
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun UpcomingTripCard(
-    booking: BookingData,
-    onBookingClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val routeText = buildString {
-        append(booking.route?.source.orEmpty())
-        append(" \u2192 ")
-        append(booking.route?.destination.orEmpty())
-    }.trim()
-
-    val depText = booking.bus?.let { bus ->
-        val outbound = formatBusScheduleDateTime(bus.departureTime)
-        val finalArrival = if (bus.tripType == "round_trip") {
-            bus.returnArrivalTime ?: bus.arrivalTime
-        } else {
-            bus.arrivalTime
-        }
-        if (finalArrival != null) {
-            "$outbound  \u2192  ${formatBusScheduleDateTime(finalArrival)}"
-        } else {
-            outbound
-        }
-    } ?: "—"
-    val pickupText = booking.pickupPoint?.name?.takeIf { it.isNotBlank() }
-    val seatsText = booking.assignedSeats?.takeIf { it.isNotBlank() }?.let { "Seats: $it" }
-        ?: "${booking.seatCount} seat(s)"
-
-    Card(
-        modifier = modifier
-            .cardShadow(RoundedCornerShape(24.dp))
-            .clickable(onClick = onBookingClick),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        border = cardBorder(),
-        shape = RoundedCornerShape(24.dp)
-    ) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(160.dp)
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(
-                                MaterialTheme.colorScheme.surfaceVariant,
-                                MaterialTheme.colorScheme.surface
-                            )
-                        )
-                    )
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = routeText.ifBlank { "Upcoming Trip" },
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
-                Spacer(Modifier.width(10.dp))
-                TripStatusChip(status = booking.status)
-            }
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Filled.Schedule,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    text = depText,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            if (pickupText != null) {
-                Text(
-                    text = pickupText,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Filled.EventSeat,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        text = seatsText,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-
-                Text(
-                    text = formatRupees(booking.totalAmount),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun TripStatusChip(status: String) {
-    val normalized = status.trim().lowercase()
-    val label = normalized
-        .split('_', ' ')
-        .filter { it.isNotBlank() }
-        .joinToString(" ") { it.replaceFirstChar { char -> char.titlecase() } }
-
-    val (bg, fg) = when (normalized) {
-        "confirmed", "approved" -> MaterialTheme.colorScheme.tertiaryContainer to MaterialTheme.colorScheme.onTertiaryContainer
-        "pending", "cancellation_requested" -> MaterialTheme.colorScheme.secondaryContainer to MaterialTheme.colorScheme.onSecondaryContainer
-        else -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
-    }
-
-    Surface(
-        color = bg,
-        contentColor = fg,
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-    }
+    ActionCard(
+        icon = Icons.Filled.Luggage,
+        title = "My Bookings",
+        subtitle = "View all Bus, Stay, and Pooja bookings",
+        onClick = onOpenMyBookings
+    )
 }
 
 @Composable
@@ -655,15 +349,6 @@ private fun SectionHeader(
                 tint = MaterialTheme.colorScheme.onSurface
             )
         }
-    }
-}
-
-private fun formatRupees(amount: Double): String {
-    return try {
-        val nf = NumberFormat.getNumberInstance(Locale("en", "IN"))
-        "₹" + nf.format(amount.toLong())
-    } catch (_: Exception) {
-        "₹" + amount.toLong()
     }
 }
 
