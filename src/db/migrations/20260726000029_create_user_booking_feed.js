@@ -101,7 +101,6 @@ exports.up = async function (knex) {
             'unitTypeCode', item.unit_type_code,
             'unitTypeName', item.unit_type_name,
             'quantity', item.quantity,
-            'capacityPerUnit', item.capacity_per_unit,
             'nightlyRate', item.nightly_rate,
             'nightCount', item.night_count,
             'lineTotal', item.line_total

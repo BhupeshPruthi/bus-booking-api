@@ -96,7 +96,6 @@ exports.up = async function (knex) {
     table.string('unit_type_code', 40).notNullable();
     table.string('unit_type_name', 100).notNullable();
     table.integer('quantity').notNullable();
-    table.integer('capacity_per_unit').nullable();
     table.decimal('nightly_rate', 12, 2).notNullable();
     table.integer('night_count').notNullable();
     table.decimal('line_total', 12, 2).notNullable();
