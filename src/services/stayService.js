@@ -459,24 +459,6 @@ class StayService {
     return this.getBookingById(bookingId);
   }
 
-  async updateUnitType(typeId, adminId, data) {
-    const type = await db('stay_unit_types').where('id', typeId).first();
-    if (!type) throw new NotFoundError('Stay accommodation type');
-    const [rate] = await db('stay_rate_history').insert({
-      unit_type_id: type.id,
-      nightly_rate: data.nightlyRate,
-      effective_from: new Date(),
-      changed_by: adminId,
-      change_note: String(data.changeNote || '').trim() || null,
-    }).returning('*');
-    await this.logAction(db, adminId, null, 'stay_rate_changed', {
-      unitTypeId: type.id,
-      nightlyRate: money(rate.nightly_rate),
-      changeNote: data.changeNote || null,
-    });
-    return this.formatUnitType({ ...type, nightly_rate: rate.nightly_rate });
-  }
-
   async completePastBookings(now = new Date()) {
     const candidates = await db('stay_bookings')
       .where('status', 'confirmed')

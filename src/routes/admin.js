@@ -1,14 +1,12 @@
 const express = require('express');
 const adminController = require('../controllers/adminController');
 const stayAdminController = require('../controllers/stayAdminController');
-const adminManagementController = require('../controllers/adminManagementController');
 const { authenticate } = require('../middlewares/authenticate');
 const {
   busAdminOrSuperUser,
   poojaAdminOrSuperUser,
   eventAdminOrSuperUser,
   stayAdminOrSuperUser,
-  adminManagerOnly,
 } = require('../middlewares/authorize');
 const { eventImageUpload, handleMulterError } = require('../middlewares/upload');
 const validate = require('../middlewares/validate');
@@ -23,8 +21,6 @@ const {
   stayCancellationListSchema,
   stayRejectionSchema,
   stayCancellationDecisionSchema,
-  updateStayUnitTypeSchema,
-  updateAdminTypeSchema,
 } = require('../validators/schemas');
 
 const router = express.Router();
@@ -153,18 +149,4 @@ router.post(
   validate(stayCancellationDecisionSchema),
   stayAdminController.decideCancellation
 );
-router.patch(
-  '/stay/unit-types/:id',
-  stayAdminOrSuperUser,
-  validate(updateStayUnitTypeSchema),
-  stayAdminController.updateUnitType
-);
-router.get('/admin-users', adminManagerOnly, adminManagementController.listUsers);
-router.patch(
-  '/admin-users/:id',
-  adminManagerOnly,
-  validate(updateAdminTypeSchema),
-  adminManagementController.updateAdminType
-);
-
 module.exports = router;

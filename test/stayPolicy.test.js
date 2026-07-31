@@ -22,7 +22,6 @@ const {
 const {
   stayCancellationDecisionSchema,
   createStayBookingSchema,
-  updateAdminTypeSchema,
 } = require('../src/validators/schemas');
 
 test('legacy admins retain Bus, Pooja, and Event capabilities', () => {
@@ -180,12 +179,4 @@ test('late cancellations support full, partial, or no discretionary refund', () 
     refundAmount: 500,
     reason: 'Admin discretion',
   }).error, undefined);
-});
-
-test('Super Admin can revoke admin access with an audited reason', () => {
-  assert.equal(updateAdminTypeSchema.validate({
-    adminType: 'consumer',
-    reason: 'Access no longer required',
-  }).error, undefined);
-  assert.ok(updateAdminTypeSchema.validate({ adminType: 'consumer' }).error);
 });

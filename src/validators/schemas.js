@@ -272,18 +272,6 @@ const stayCancellationDecisionSchema = Joi.object({
   }),
 });
 
-const updateStayUnitTypeSchema = Joi.object({
-  nightlyRate: Joi.number().positive().precision(2).required(),
-  changeNote: Joi.string().max(500).allow('', null).trim(),
-});
-
-const updateAdminTypeSchema = Joi.object({
-  adminType: Joi.string()
-    .valid('consumer', 'bus_admin', 'stay_admin', 'super_admin')
-    .required(),
-  reason: Joi.string().max(1000).trim().required(),
-});
-
 // ============ EVENTS SCHEMAS ============
 
 const createEventSchema = Joi.object({
@@ -352,8 +340,6 @@ module.exports = {
   stayCancellationListSchema,
   stayRejectionSchema,
   stayCancellationDecisionSchema,
-  updateStayUnitTypeSchema,
-  updateAdminTypeSchema,
 
   // Events
   createEventSchema,

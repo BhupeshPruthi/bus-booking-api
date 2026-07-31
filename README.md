@@ -148,10 +148,11 @@ for backward compatibility:
 | `super_admin` | All administration, including assigning admin access |
 
 The Stay migration automatically maps existing admins to
-`bus_admin`, preserving their existing Bus, Pooja, and Event access. Super
-Admins can assign, change, or revoke admin access from the Android app. Admin
-authorization is checked against the current database row on every protected
-request, so a role change takes effect immediately.
+`bus_admin`, preserving their existing Bus, Pooja, and Event access. Admin
+types and Stay prices are maintained directly in the database; the runtime API
+does not expose user-access or price-management endpoints. Authorization is
+checked against the current database row on every protected request, so a role
+change takes effect immediately.
 
 Stay uses aggregate inventory rather than numbered rooms. Pending requests do
 not reserve inventory; confirmation atomically checks availability. Prices

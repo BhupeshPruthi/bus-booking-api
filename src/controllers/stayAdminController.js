@@ -25,12 +25,6 @@ const decideCancellation = asyncHandler(async (req, res) => {
     data: await stayService.decideCancellation(req.params.id, req.user.id, req.body),
   });
 });
-const updateUnitType = asyncHandler(async (req, res) => {
-  res.json({
-    success: true,
-    data: await stayService.updateUnitType(req.params.id, req.user.id, req.body),
-  });
-});
 module.exports = {
   getBookings,
   getBooking,
@@ -38,5 +32,4 @@ module.exports = {
   rejectBooking,
   getCancellations,
   decideCancellation,
-  updateUnitType,
 };

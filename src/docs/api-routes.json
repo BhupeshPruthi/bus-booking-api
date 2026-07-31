@@ -57,10 +57,7 @@
     { "method": "POST", "path": "/api/admin/stay/bookings/:id/confirm", "auth": "bearer+stayAdmin", "group": "stay-admin" },
     { "method": "POST", "path": "/api/admin/stay/bookings/:id/reject", "auth": "bearer+stayAdmin", "group": "stay-admin" },
     { "method": "GET", "path": "/api/admin/stay/cancellation-requests", "auth": "bearer+stayAdmin", "group": "stay-admin" },
-    { "method": "POST", "path": "/api/admin/stay/cancellation-requests/:id/decision", "auth": "bearer+stayAdmin", "group": "stay-admin" },
-    { "method": "PATCH", "path": "/api/admin/stay/unit-types/:id", "auth": "bearer+stayAdmin", "group": "stay-admin" },
-    { "method": "GET", "path": "/api/admin/admin-users", "auth": "bearer+superAdmin", "group": "admin-management" },
-    { "method": "PATCH", "path": "/api/admin/admin-users/:id", "auth": "bearer+superAdmin", "group": "admin-management" }
+    { "method": "POST", "path": "/api/admin/stay/cancellation-requests/:id/decision", "auth": "bearer+stayAdmin", "group": "stay-admin" }
   ],
   "myBusAndroidRetrofit": {
     "source": "MyBus/app/src/main/java/com/mybus/app/data/remote/ApiService.kt",
@@ -101,10 +98,7 @@
       "admin/stay/bookings/{id}/confirm",
       "admin/stay/bookings/{id}/reject",
       "admin/stay/cancellation-requests",
-      "admin/stay/cancellation-requests/{id}/decision",
-      "admin/stay/unit-types/{id}",
-      "admin/admin-users",
-      "admin/admin-users/{id}"
+      "admin/stay/cancellation-requests/{id}/decision"
     ]
   }
 }
