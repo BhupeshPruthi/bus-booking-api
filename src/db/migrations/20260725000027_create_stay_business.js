@@ -35,21 +35,10 @@ exports.up = async function (knex) {
     table.string('display_name', 100).notNullable();
     table.integer('capacity').nullable();
     table.integer('total_inventory').notNullable();
+    table.decimal('nightly_rate', 12, 2).notNullable();
     table.integer('display_order').notNullable().defaultTo(0);
     table.boolean('is_active').notNullable().defaultTo(true);
     table.timestamps(true, true);
-  });
-
-  await knex.schema.createTable('stay_rate_history', (table) => {
-    table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
-    table.uuid('unit_type_id').notNullable()
-      .references('id').inTable('stay_unit_types').onDelete('CASCADE');
-    table.decimal('nightly_rate', 12, 2).notNullable();
-    table.timestamp('effective_from', { useTz: true }).notNullable().defaultTo(knex.fn.now());
-    table.uuid('changed_by').nullable().references('id').inTable('users').onDelete('SET NULL');
-    table.text('change_note').nullable();
-    table.timestamp('created_at', { useTz: true }).notNullable().defaultTo(knex.fn.now());
-    table.index(['unit_type_id', 'effective_from']);
   });
 
   await knex.schema.createTable('stay_bookings', (table) => {
@@ -128,18 +117,6 @@ exports.up = async function (knex) {
     });
   });
 
-  await knex.schema.createTable('stay_booking_status_history', (table) => {
-    table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
-    table.uuid('booking_id').notNullable()
-      .references('id').inTable('stay_bookings').onDelete('CASCADE');
-    table.string('from_status', 40).nullable();
-    table.string('to_status', 40).notNullable();
-    table.uuid('changed_by').nullable().references('id').inTable('users').onDelete('SET NULL');
-    table.text('reason').nullable();
-    table.timestamp('created_at', { useTz: true }).notNullable().defaultTo(knex.fn.now());
-    table.index(['booking_id', 'created_at']);
-  });
-
   await knex.schema.createTable('admin_role_history', (table) => {
     table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
     table.uuid('user_id').notNullable().references('id').inTable('users').onDelete('CASCADE');
@@ -153,25 +130,24 @@ exports.up = async function (knex) {
     table.index(['user_id', 'created_at']);
   });
 
-  const types = await knex('stay_unit_types')
-    .insert([
-      { code: 'three_bed_room', display_name: '3 Bed Room', capacity: 3, total_inventory: 13, display_order: 1 },
-      { code: 'four_bed_room', display_name: '4 Bed Room', capacity: 4, total_inventory: 1, display_order: 2 },
-      { code: 'five_bed_room', display_name: '5 Bed Room', capacity: 5, total_inventory: 1, display_order: 3 },
-      { code: 'hall', display_name: 'Hall', capacity: 25, total_inventory: 3, display_order: 4 },
-    ])
-    .returning(['id', 'code']);
-
-  const initialRates = {
-    three_bed_room: 1200,
-    four_bed_room: 1500,
-    five_bed_room: 1600,
-    hall: 3500,
-  };
-  await knex('stay_rate_history').insert(types.map((type) => ({
-    unit_type_id: type.id,
-    nightly_rate: initialRates[type.code],
-  })));
+  await knex('stay_unit_types').insert([
+    {
+      code: 'three_bed_room', display_name: '3 Bed Room', capacity: 3,
+      total_inventory: 13, nightly_rate: 1200, display_order: 1,
+    },
+    {
+      code: 'four_bed_room', display_name: '4 Bed Room', capacity: 4,
+      total_inventory: 1, nightly_rate: 1500, display_order: 2,
+    },
+    {
+      code: 'five_bed_room', display_name: '5 Bed Room', capacity: 5,
+      total_inventory: 1, nightly_rate: 1600, display_order: 3,
+    },
+    {
+      code: 'hall', display_name: 'Hall', capacity: 25,
+      total_inventory: 3, nightly_rate: 3500, display_order: 4,
+    },
+  ]);
 };
 
 /**
@@ -179,11 +155,9 @@ exports.up = async function (knex) {
  */
 exports.down = async function (knex) {
   await knex.schema.dropTableIfExists('admin_role_history');
-  await knex.schema.dropTableIfExists('stay_booking_status_history');
   await knex.schema.dropTableIfExists('stay_cancellation_requests');
   await knex.schema.dropTableIfExists('stay_booking_items');
   await knex.schema.dropTableIfExists('stay_bookings');
-  await knex.schema.dropTableIfExists('stay_rate_history');
   await knex.schema.dropTableIfExists('stay_unit_types');
   await knex.raw('ALTER TABLE users DROP CONSTRAINT IF EXISTS users_admin_type_check');
   await knex.schema.alterTable('users', (table) => {

@@ -99,19 +99,10 @@ function bookingReference(now = new Date()) {
 
 class StayService {
   async currentTypes(trx = db, codes = UNIT_TYPE_CODES) {
-    const types = await trx('stay_unit_types')
+    return trx('stay_unit_types')
       .whereIn('code', codes)
       .where('is_active', true)
       .orderBy('display_order', 'asc');
-    return Promise.all(types.map(async (type) => {
-      const rate = await trx('stay_rate_history')
-        .where('unit_type_id', type.id)
-        .where('effective_from', '<=', new Date())
-        .orderBy('effective_from', 'desc')
-        .first();
-      if (!rate) throw new ValidationError(`No active price exists for ${type.display_name}`);
-      return { ...type, nightly_rate: rate.nightly_rate };
-    }));
   }
 
   async getCatalog() {
@@ -246,7 +237,6 @@ class StayService {
       await trx('stay_booking_items').insert(
         items.map((item) => ({ ...item, booking_id: booking.id }))
       );
-      await this.recordStatus(trx, booking.id, null, 'pending', userId, 'Customer request submitted');
       return booking.id;
     });
     return this.getBookingById(bookingId, userId);
@@ -290,7 +280,6 @@ class StayService {
         confirmed_at: now,
         updated_at: now,
       });
-      await this.recordStatus(trx, bookingId, 'pending', 'confirmed', adminId, 'Confirmed by Stay Admin');
     });
     return this.getBookingById(bookingId);
   }
@@ -310,7 +299,6 @@ class StayService {
         rejection_reason: String(reason).trim(),
         updated_at: now,
       });
-      await this.recordStatus(trx, bookingId, 'pending', 'rejected', adminId, reason);
     });
     return this.getBookingById(bookingId);
   }
@@ -351,16 +339,6 @@ class StayService {
         status: transition.bookingStatus,
         updated_at: now,
       });
-      await this.recordStatus(
-        trx,
-        booking.id,
-        booking.status,
-        transition.bookingStatus,
-        userId,
-        reason || (isImmediate
-          ? 'Customer cancelled before admin approval'
-          : 'Customer requested cancellation')
-      );
       return request.id;
     });
     return this.getCancellationById(cancellationId);
@@ -396,14 +374,6 @@ class StayService {
           status: request.previous_booking_status,
           updated_at: now,
         });
-        await this.recordStatus(
-          trx,
-          booking.id,
-          'cancellation_requested',
-          request.previous_booking_status,
-          adminId,
-          data.reason
-        );
         return;
       }
 
@@ -436,14 +406,6 @@ class StayService {
         status: 'cancelled',
         updated_at: now,
       });
-      await this.recordStatus(
-        trx,
-        booking.id,
-        'cancellation_requested',
-        'cancelled',
-        adminId,
-        data.reason || `Refund: ${decision}`
-      );
     });
     return this.getBookingById(bookingId);
   }
@@ -464,14 +426,6 @@ class StayService {
           completed_at: now,
           updated_at: now,
         });
-        await this.recordStatus(
-          trx,
-          booking.id,
-          'confirmed',
-          'completed',
-          null,
-          'Checkout time passed'
-        );
         count += 1;
       });
     }
@@ -626,16 +580,6 @@ class StayService {
     if (excludeBookingId) query = query.whereNot('b.id', excludeBookingId);
     const row = await query.sum('i.quantity as quantity').first();
     return Number(row?.quantity || 0);
-  }
-
-  async recordStatus(trx, bookingId, fromStatus, toStatus, changedBy, reason) {
-    await trx('stay_booking_status_history').insert({
-      booking_id: bookingId,
-      from_status: fromStatus,
-      to_status: toStatus,
-      changed_by: changedBy,
-      reason: String(reason || '').trim() || null,
-    });
   }
 
   formatUnitType(row) {

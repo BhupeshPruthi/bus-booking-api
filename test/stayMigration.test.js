@@ -20,9 +20,10 @@ const stayService = fs.readFileSync(
   'utf8'
 );
 
-test('Stay migration uses aggregate inventory and immutable rate history', () => {
+test('Stay migration uses aggregate inventory and current catalogue pricing', () => {
   assert.match(migration, /total_inventory/);
-  assert.match(migration, /stay_rate_history/);
+  assert.match(migration, /nightly_rate/);
+  assert.doesNotMatch(migration, /stay_rate_history/);
   assert.doesNotMatch(migration, /createTable\('stay_units'/);
   assert.doesNotMatch(migration, /stay_booking_unit_assignments/);
 });
@@ -41,10 +42,20 @@ test('Stay migration preserves existing Bus, Pooja, and Event admins', () => {
   assert.match(migration, /'bus_admin', 'stay_admin', 'super_admin'/);
 });
 
-test('Stay migration retains booking status and role history indefinitely', () => {
-  assert.match(migration, /stay_booking_status_history/);
+test('Stay migration keeps only the required booking workflow tables', () => {
+  const stayTables = [...migration.matchAll(/createTable\('(stay_[^']+)'/g)]
+    .map((match) => match[1]);
+  assert.deepEqual(stayTables, [
+    'stay_unit_types',
+    'stay_bookings',
+    'stay_booking_items',
+    'stay_cancellation_requests',
+  ]);
+  assert.doesNotMatch(migration, /stay_booking_status_history/);
   assert.doesNotMatch(migration, /stay_admin_actions/);
   assert.doesNotMatch(stayService, /stay_admin_actions/);
   assert.doesNotMatch(stayService, /logAction\(/);
+  assert.doesNotMatch(stayService, /stay_booking_status_history/);
+  assert.doesNotMatch(stayService, /recordStatus\(/);
   assert.match(migration, /admin_role_history/);
 });
