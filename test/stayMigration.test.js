@@ -57,5 +57,5 @@ test('Stay migration keeps only the required booking workflow tables', () => {
   assert.doesNotMatch(stayService, /logAction\(/);
   assert.doesNotMatch(stayService, /stay_booking_status_history/);
   assert.doesNotMatch(stayService, /recordStatus\(/);
-  assert.match(migration, /admin_role_history/);
+  assert.doesNotMatch(migration, /admin_role_history/);
 });

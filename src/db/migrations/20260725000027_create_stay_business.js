@@ -117,19 +117,6 @@ exports.up = async function (knex) {
     });
   });
 
-  await knex.schema.createTable('admin_role_history', (table) => {
-    table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
-    table.uuid('user_id').notNullable().references('id').inTable('users').onDelete('CASCADE');
-    table.string('previous_role', 40).notNullable();
-    table.string('previous_admin_type', 40).nullable();
-    table.string('new_role', 40).notNullable();
-    table.string('new_admin_type', 40).nullable();
-    table.uuid('changed_by').nullable().references('id').inTable('users').onDelete('SET NULL');
-    table.text('reason').notNullable();
-    table.timestamp('created_at', { useTz: true }).notNullable().defaultTo(knex.fn.now());
-    table.index(['user_id', 'created_at']);
-  });
-
   await knex('stay_unit_types').insert([
     {
       code: 'three_bed_room', display_name: '3 Bed Room', capacity: 3,
@@ -154,7 +141,6 @@ exports.up = async function (knex) {
  * @param { import("knex").Knex } knex
  */
 exports.down = async function (knex) {
-  await knex.schema.dropTableIfExists('admin_role_history');
   await knex.schema.dropTableIfExists('stay_cancellation_requests');
   await knex.schema.dropTableIfExists('stay_booking_items');
   await knex.schema.dropTableIfExists('stay_bookings');
