@@ -45,7 +45,9 @@ class AuthRepository @Inject constructor(
                     email = loginData.user.email,
                     name = loginData.user.name,
                     role = loginData.user.role,
-                    isSuperUserFlag = loginData.user.isSuperUser
+                    isSuperUserFlag = loginData.user.isSuperUser,
+                    adminTypeValue = loginData.user.adminType,
+                    capabilityValues = loginData.user.capabilities
                 )
                 Result.success(loginData)
             } else {

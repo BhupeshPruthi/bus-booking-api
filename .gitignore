@@ -38,6 +38,7 @@ build/
 
 # Android app generated/local files
 MyBus/.gradle/
+MyBus/.gradle-user-home/
 MyBus/.kotlin/
 MyBus/.idea/
 MyBus/build/

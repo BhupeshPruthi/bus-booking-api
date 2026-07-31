@@ -30,6 +30,8 @@ class TokenManager @Inject constructor(
         private val USER_NAME = stringPreferencesKey("user_name")
         private val USER_ROLE = stringPreferencesKey("user_role")
         private val USER_IS_SUPERUSER = booleanPreferencesKey("user_is_superuser")
+        private val USER_ADMIN_TYPE = stringPreferencesKey("user_admin_type")
+        private val USER_CAPABILITIES = stringPreferencesKey("user_capabilities")
         /** Debug only: `"admin"` | `"consumer"` — empty = use server role */
         private val DEBUG_ROLE_OVERRIDE = stringPreferencesKey("debug_role_override")
     }
@@ -42,6 +44,14 @@ class TokenManager @Inject constructor(
     val userName: Flow<String?> = context.dataStore.data.map { it[USER_NAME] }
     val userRole: Flow<String?> = context.dataStore.data.map { it[USER_ROLE] }
     val isSuperUser: Flow<Boolean> = context.dataStore.data.map { it[USER_IS_SUPERUSER] == true }
+    val adminType: Flow<String?> = context.dataStore.data.map { it[USER_ADMIN_TYPE] }
+    val capabilities: Flow<Set<String>> = context.dataStore.data.map { prefs ->
+        prefs[USER_CAPABILITIES]
+            ?.split(",")
+            ?.filter { it.isNotBlank() }
+            ?.toSet()
+            ?: emptySet()
+    }
 
     val debugRoleOverride: Flow<String?> = context.dataStore.data.map {
         it[DEBUG_ROLE_OVERRIDE]?.takeIf { v -> v.isNotBlank() }
@@ -51,16 +61,53 @@ class TokenManager @Inject constructor(
     val effectiveIsAdmin: Flow<Boolean> = combine(
         userRole,
         isSuperUser,
+        adminType,
         debugRoleOverride
-    ) { role, superU, override ->
+    ) { role, superU, type, override ->
         when (override) {
             "admin" -> true
             "consumer" -> false
-            else -> role == "admin" || role == "superuser" || superU
+            else -> superU ||
+                type == "super_admin" ||
+                type == "bus_admin" ||
+                (role == "admin" && type.isNullOrBlank())
         }
     }
 
     suspend fun readEffectiveIsAdmin(): Boolean = effectiveIsAdmin.first()
+
+    /** Any persisted admin type can read shared areas such as feedback. */
+    val isAnyAdmin: Flow<Boolean> = combine(
+        userRole,
+        isSuperUser,
+        adminType,
+        debugRoleOverride
+    ) { role, superU, type, override ->
+        when (override) {
+            "admin" -> true
+            "consumer" -> false
+            else -> superU ||
+                role == "admin" ||
+                role == "superuser" ||
+                type in setOf("bus_admin", "stay_admin", "super_admin")
+        }
+    }
+
+    val canManageStay: Flow<Boolean> = combine(
+        isSuperUser,
+        adminType,
+        capabilities
+    ) { superU, type, caps ->
+        superU || type == "super_admin" || type == "stay_admin" || "stay.manage" in caps
+    }
+
+    val canManageEvents: Flow<Boolean> = combine(
+        isSuperUser,
+        adminType,
+        capabilities
+    ) { superU, type, caps ->
+        superU || type == "super_admin" || type == "bus_admin" || "event.manage" in caps
+    }
 
     suspend fun setDebugRoleOverride(mode: String?) {
         context.dataStore.edit { prefs ->
@@ -82,7 +129,9 @@ class TokenManager @Inject constructor(
         email: String?,
         name: String?,
         role: String,
-        isSuperUserFlag: Boolean = false
+        isSuperUserFlag: Boolean = false,
+        adminTypeValue: String? = null,
+        capabilityValues: List<String> = emptyList()
     ) {
         context.dataStore.edit { prefs ->
             prefs[USER_ID] = id
@@ -99,6 +148,16 @@ class TokenManager @Inject constructor(
             name?.let { prefs[USER_NAME] = it }
             prefs[USER_ROLE] = role
             prefs[USER_IS_SUPERUSER] = isSuperUserFlag
+            if (adminTypeValue.isNullOrBlank()) {
+                prefs.remove(USER_ADMIN_TYPE)
+            } else {
+                prefs[USER_ADMIN_TYPE] = adminTypeValue
+            }
+            if (capabilityValues.isEmpty()) {
+                prefs.remove(USER_CAPABILITIES)
+            } else {
+                prefs[USER_CAPABILITIES] = capabilityValues.joinToString(",")
+            }
         }
     }
 

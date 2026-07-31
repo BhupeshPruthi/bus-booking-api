@@ -6,11 +6,13 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Hotel
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.SelfImprovement
+import androidx.compose.material.icons.filled.SupportAgent
 import androidx.compose.material.icons.outlined.DirectionsBus
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Hotel
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.SelfImprovement
+import androidx.compose.material.icons.outlined.SupportAgent
 import androidx.compose.ui.graphics.vector.ImageVector
 
 data class BottomNavItem(
@@ -25,6 +27,7 @@ object BottomTabs {
     const val BUS = "tab_bus"
     const val POOJA = "tab_pooja"
     const val STAY = "tab_stay"
+    const val HELP = "tab_help"
     const val PROFILE = "tab_profile"
 
     val items: List<BottomNavItem> = listOf(
@@ -51,6 +54,12 @@ object BottomTabs {
             label = "Stay",
             selectedIcon = Icons.Filled.Hotel,
             unselectedIcon = Icons.Outlined.Hotel
+        ),
+        BottomNavItem(
+            route = HELP,
+            label = "Help",
+            selectedIcon = Icons.Filled.SupportAgent,
+            unselectedIcon = Icons.Outlined.SupportAgent
         )
     )
 }

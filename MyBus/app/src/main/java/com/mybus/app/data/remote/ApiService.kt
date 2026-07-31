@@ -16,6 +16,9 @@ import retrofit2.http.Query
 
 interface ApiService {
 
+    @GET("help-contacts")
+    suspend fun getHelpContacts(): Response<ApiResponse<List<HelpContact>>>
+
     @POST("auth/google")
     suspend fun signInWithGoogle(@Body request: GoogleSignInRequest): Response<ApiResponse<LoginData>>
 
@@ -99,6 +102,20 @@ interface ApiService {
         @Query("status") status: String? = null
     ): Response<ApiResponse<List<BookingData>>>
 
+    @GET("me/bookings")
+    suspend fun getUnifiedBookings(
+        @Query("bucket") bucket: String,
+        @Query("types") types: String? = null,
+        @Query("cursor") cursor: String? = null,
+        @Query("limit") limit: Int? = null
+    ): Response<ApiResponse<UnifiedBookingPage>>
+
+    @GET("me/bookings/{bookingType}/{bookingId}")
+    suspend fun getUnifiedBooking(
+        @Path("bookingType") bookingType: String,
+        @Path("bookingId") bookingId: String
+    ): Response<ApiResponse<UnifiedBookingItem>>
+
     @GET("bookings/{id}")
     suspend fun getBookingById(@Path("id") bookingId: String): Response<ApiResponse<BookingData>>
 
@@ -126,4 +143,85 @@ interface ApiService {
         @Path("id") bookingId: String,
         @Body request: BookingCancellationRequest = BookingCancellationRequest()
     ): Response<ApiResponse<BookingData>>
+
+    @GET("stays/catalog")
+    suspend fun getStayCatalog(): Response<ApiResponse<StayCatalog>>
+
+    @POST("stays/quote")
+    suspend fun getStayQuote(@Body request: StayQuoteRequest): Response<ApiResponse<StayQuote>>
+
+    @POST("stays/bookings")
+    suspend fun createStayBooking(
+        @Body request: CreateStayBookingRequest
+    ): Response<ApiResponse<StayBooking>>
+
+    @GET("stays/bookings")
+    suspend fun getMyStayBookings(
+        @Query("page") page: Int? = null,
+        @Query("limit") limit: Int? = null
+    ): Response<ApiResponse<StayPage<StayBooking>>>
+
+    @GET("stays/bookings/{id}")
+    suspend fun getStayBooking(@Path("id") id: String): Response<ApiResponse<StayBooking>>
+
+    @POST("stays/bookings/{id}/cancellation-requests")
+    suspend fun requestStayCancellation(
+        @Path("id") id: String,
+        @Body request: StayCancellationRequest
+    ): Response<ApiResponse<StayCancellation>>
+
+    @GET("admin/stay/bookings")
+    suspend fun getAdminStayBookings(
+        @Query("status") status: String? = null,
+        @Query("search") search: String? = null,
+        @Query("page") page: Int? = null,
+        @Query("limit") limit: Int? = null
+    ): Response<ApiResponse<StayPage<StayBooking>>>
+
+    @POST("admin/stay/bookings/{id}/confirm")
+    suspend fun confirmStayBooking(@Path("id") id: String): Response<ApiResponse<StayBooking>>
+
+    @POST("admin/stay/bookings/{id}/reject")
+    suspend fun rejectStayBooking(
+        @Path("id") id: String,
+        @Body request: StayRejectionRequest
+    ): Response<ApiResponse<StayBooking>>
+
+    @GET("admin/stay/cancellation-requests")
+    suspend fun getStayCancellationRequests(
+        @Query("status") status: String? = null,
+        @Query("page") page: Int? = null,
+        @Query("limit") limit: Int? = null
+    ): Response<ApiResponse<StayPage<StayCancellation>>>
+
+    @POST("admin/stay/cancellation-requests/{id}/decision")
+    suspend fun decideStayCancellation(
+        @Path("id") id: String,
+        @Body request: StayCancellationDecisionRequest
+    ): Response<ApiResponse<StayBooking>>
+
+    @GET("admin/stay/coupons")
+    suspend fun getStayCoupons(): Response<ApiResponse<List<StayCoupon>>>
+
+    @POST("admin/stay/coupons")
+    suspend fun createStayCoupon(
+        @Body request: CreateStayCouponRequest
+    ): Response<ApiResponse<StayCoupon>>
+
+    @POST("admin/stay/coupons/{id}/deactivate")
+    suspend fun deactivateStayCoupon(
+        @Path("id") id: String
+    ): Response<ApiResponse<StayCoupon>>
+
+    @POST("feedback")
+    suspend fun submitFeedback(
+        @Body request: CreateFeedbackRequest
+    ): Response<ApiResponse<FeedbackSubmission>>
+
+    @GET("admin/feedback")
+    suspend fun getAdminFeedback(
+        @Query("page") page: Int? = null,
+        @Query("limit") limit: Int? = null
+    ): Response<ApiResponse<FeedbackPage>>
+
 }
