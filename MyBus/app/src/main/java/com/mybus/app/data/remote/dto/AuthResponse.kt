@@ -17,12 +17,6 @@ data class ApiError(
 )
 
 @JsonClass(generateAdapter = true)
-data class ApiErrorEnvelope(
-    @Json(name = "success") val success: Boolean = false,
-    @Json(name = "error") val error: ApiError? = null
-)
-
-@JsonClass(generateAdapter = true)
 data class LoginData(
     @Json(name = "accessToken") val accessToken: String,
     @Json(name = "refreshToken") val refreshToken: String,
@@ -37,8 +31,6 @@ data class UserInfo(
     @Json(name = "email") val email: String? = null,
     @Json(name = "role") val role: String,
     @Json(name = "isSuperUser") val isSuperUser: Boolean = false,
-    @Json(name = "adminType") val adminType: String? = null,
-    @Json(name = "capabilities") val capabilities: List<String> = emptyList(),
     @Json(name = "isNewUser") val isNewUser: Boolean
 )
 

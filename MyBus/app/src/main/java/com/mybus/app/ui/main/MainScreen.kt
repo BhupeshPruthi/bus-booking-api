@@ -29,6 +29,7 @@ import com.mybus.app.ui.home.HomeTab
 import com.mybus.app.ui.navigation.BottomTabs
 import com.mybus.app.ui.theme.BrandOrange
 import com.mybus.app.ui.theme.TabBarIndicatorGradientFill
+import com.mybus.app.ui.pooja.MyPoojaTokensScreen
 import com.mybus.app.ui.pooja.PoojaBookingScreen
 import com.mybus.app.ui.pooja.PoojaDetailScreen
 import com.mybus.app.ui.pooja.PoojaTab
@@ -37,8 +38,7 @@ import com.mybus.app.ui.pooja.UpcomingPoojaListScreen
 import com.mybus.app.ui.profile.ProfileScreen
 import com.mybus.app.ui.stay.StayTab
 import com.mybus.app.ui.trips.BookingDetailScreen
-import com.mybus.app.ui.trips.MyBookingsScreen
-import com.mybus.app.ui.trips.UnifiedBookingDetailScreen
+import com.mybus.app.ui.trips.MyTripsScreen
 import com.mybus.app.ui.auth.AuthUiState
 import com.mybus.app.ui.auth.AuthViewModel
 import com.mybus.app.ui.auth.LoginScreen
@@ -66,9 +66,6 @@ fun MainScreen(
     val isLoggedIn = !accessToken.isNullOrBlank()
 
     val isAdmin by tokenManager.effectiveIsAdmin.collectAsStateWithLifecycle(initialValue = false)
-    val canManageStay by tokenManager.canManageStay.collectAsStateWithLifecycle(initialValue = false)
-    val canManageEvents by tokenManager.canManageEvents.collectAsStateWithLifecycle(initialValue = false)
-    val canManageAdmins by tokenManager.canManageAdmins.collectAsStateWithLifecycle(initialValue = false)
 
     val detailRoutes = remember {
         setOf(
@@ -78,14 +75,12 @@ fun MainScreen(
             "select_stops",
             "schedule_pooja",
             "my_pooja_tokens",
-            "my_stay_bookings",
             "pooja_upcoming_list",
             "bus_detail/{busId}",
             "admin_bus_detail/{busId}",
             "pooja_detail/{poojaId}",
             "pooja_book/{poojaId}",
             "booking_detail/{bookingId}",
-            "my_booking_detail/{bookingType}/{bookingId}",
             "my_trips",
             "live_events_web",
             BottomTabs.PROFILE
@@ -143,12 +138,20 @@ fun MainScreen(
             // ---- Bottom tabs ----
             composable(BottomTabs.HOME) {
                 HomeTab(
-                    canManageEvents = canManageEvents,
-                    onOpenMyBookings = {
+                    isAdmin = isAdmin,
+                    isLoggedIn = isLoggedIn,
+                    onOpenMyTrips = {
                         if (isLoggedIn) {
                             tabNavController.navigate("my_trips") {
                                 launchSingleTop = true
                             }
+                        } else {
+                            onRequireLogin()
+                        }
+                    },
+                    onOpenBookingDetail = { bookingId ->
+                        if (isLoggedIn) {
+                            tabNavController.navigate("booking_detail/$bookingId")
                         } else {
                             onRequireLogin()
                         }
@@ -209,15 +212,7 @@ fun MainScreen(
                 )
             }
             composable(BottomTabs.STAY) {
-                StayTab(
-                    isStayAdmin = canManageStay,
-                    canManageAdmins = canManageAdmins,
-                    isLoggedIn = isLoggedIn,
-                    onRequireLogin = onRequireLogin,
-                    onOpenMyBookings = {
-                        tabNavController.navigate("my_stay_bookings")
-                    }
-                )
+                StayTab()
             }
             composable(BottomTabs.PROFILE) {
                 ProfileScreen(
@@ -279,22 +274,7 @@ fun MainScreen(
                 )
             }
             composable("my_pooja_tokens") {
-                MyBookingsScreen(
-                    initialType = "pooja",
-                    onBookingClick = { bookingType, bookingId ->
-                        tabNavController.navigate("my_booking_detail/$bookingType/$bookingId")
-                    },
-                    onBack = { tabNavController.popBackStack() },
-                    isLoggedIn = isLoggedIn,
-                    onRequireLogin = onRequireLogin
-                )
-            }
-            composable("my_stay_bookings") {
-                MyBookingsScreen(
-                    initialType = "stay",
-                    onBookingClick = { bookingType, bookingId ->
-                        tabNavController.navigate("my_booking_detail/$bookingType/$bookingId")
-                    },
+                MyPoojaTokensScreen(
                     onBack = { tabNavController.popBackStack() },
                     isLoggedIn = isLoggedIn,
                     onRequireLogin = onRequireLogin
@@ -360,24 +340,13 @@ fun MainScreen(
                 )
             }
             composable("my_trips") {
-                MyBookingsScreen(
-                    onBookingClick = { bookingType, bookingId ->
-                        tabNavController.navigate("my_booking_detail/$bookingType/$bookingId")
+                MyTripsScreen(
+                    onBookingClick = { bookingId ->
+                        tabNavController.navigate("booking_detail/$bookingId")
                     },
                     onBack = { tabNavController.popBackStack() },
                     isLoggedIn = isLoggedIn,
                     onRequireLogin = onRequireLogin
-                )
-            }
-            composable(
-                route = "my_booking_detail/{bookingType}/{bookingId}",
-                arguments = listOf(
-                    navArgument("bookingType") { type = NavType.StringType },
-                    navArgument("bookingId") { type = NavType.StringType }
-                )
-            ) {
-                UnifiedBookingDetailScreen(
-                    onBack = { tabNavController.popBackStack() }
                 )
             }
             composable(
