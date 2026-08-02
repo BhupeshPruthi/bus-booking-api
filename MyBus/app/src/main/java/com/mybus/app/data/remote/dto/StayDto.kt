@@ -85,10 +85,34 @@ data class StayPage<T>(
 )
 
 @JsonClass(generateAdapter = true)
+data class StayDailyOccupancyReport(
+    @Json(name = "fromDate") val fromDate: String,
+    @Json(name = "toDate") val toDate: String,
+    @Json(name = "days") val days: List<StayDailyOccupancyDay>
+)
+
+@JsonClass(generateAdapter = true)
+data class StayDailyOccupancyDay(
+    @Json(name = "date") val date: String,
+    @Json(name = "bookingCount") val bookingCount: Int,
+    @Json(name = "unitTypes") val unitTypes: List<StayDailyOccupancyUnit>
+)
+
+@JsonClass(generateAdapter = true)
+data class StayDailyOccupancyUnit(
+    @Json(name = "code") val code: String,
+    @Json(name = "displayName") val displayName: String,
+    @Json(name = "bookedUnits") val bookedUnits: Int,
+    @Json(name = "totalUnits") val totalUnits: Int,
+    @Json(name = "availableUnits") val availableUnits: Int
+)
+
+@JsonClass(generateAdapter = true)
 data class StayBooking(
     @Json(name = "id") val id: String,
     @Json(name = "reference") val reference: String,
     @Json(name = "userId") val userId: String? = null,
+    @Json(name = "bookingSource") val bookingSource: String = "customer",
     @Json(name = "status") val status: String,
     @Json(name = "checkInDate") val checkInDate: String,
     @Json(name = "checkOutDate") val checkOutDate: String,
@@ -153,6 +177,13 @@ data class StayRejectionRequest(@Json(name = "reason") val reason: String)
 data class StayCancellationDecisionRequest(
     @Json(name = "action") val action: String,
     @Json(name = "refundDecision") val refundDecision: String? = null,
+    @Json(name = "refundAmount") val refundAmount: Double? = null,
+    @Json(name = "reason") val reason: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class AdminStayCancellationRequest(
+    @Json(name = "refundDecision") val refundDecision: String,
     @Json(name = "refundAmount") val refundAmount: Double? = null,
     @Json(name = "reason") val reason: String? = null
 )

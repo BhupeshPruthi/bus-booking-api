@@ -13,6 +13,13 @@ data class ApiResponse<T>(
 @JsonClass(generateAdapter = true)
 data class ApiError(
     @Json(name = "code") val code: String,
+    @Json(name = "message") val message: String,
+    @Json(name = "details") val details: List<ApiErrorDetail>? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class ApiErrorDetail(
+    @Json(name = "field") val field: String,
     @Json(name = "message") val message: String
 )
 

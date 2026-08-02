@@ -1,11 +1,13 @@
 package com.mybus.app.ui.stay
 
 import android.app.DatePickerDialog
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
@@ -18,8 +20,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.mybus.app.data.remote.dto.StayBooking
+import com.mybus.app.data.remote.dto.CreateStayBookingRequest
+import com.mybus.app.data.remote.dto.StayBookingItemRequest
 import com.mybus.app.data.remote.dto.StayCancellation
 import com.mybus.app.data.remote.dto.StayCoupon
+import com.mybus.app.data.remote.dto.StayDailyOccupancyDay
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -27,9 +32,11 @@ private enum class StayAdminPage(val title: String) {
     DASHBOARD("Stay Admin"),
     PENDING("Pending Requests"),
     CONFIRMED("Confirmed Bookings"),
+    OCCUPANCY("Daily Occupancy"),
     CANCELLATIONS("Cancellation Requests"),
     COUPONS("Coupons"),
-    ARCHIVE("All Stay Records")
+    ARCHIVE("All Stay Records"),
+    CREATE_BOOKING("Make Booking")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -42,6 +49,7 @@ fun StayAdminScreen(viewModel: StayAdminViewModel = hiltViewModel()) {
     var cancellationTarget by remember { mutableStateOf<StayCancellation?>(null) }
     var showCreateCoupon by remember { mutableStateOf(false) }
     var deactivateCoupon by remember { mutableStateOf<StayCoupon?>(null) }
+    var adminCancellationTarget by remember { mutableStateOf<StayBooking?>(null) }
     var reason by remember { mutableStateOf("") }
 
     state.error?.let {
@@ -89,6 +97,21 @@ fun StayAdminScreen(viewModel: StayAdminViewModel = hiltViewModel()) {
             }
         )
     }
+    adminCancellationTarget?.let { booking ->
+        AdminStayCancellationDialog(
+            booking = booking,
+            onDismiss = { adminCancellationTarget = null },
+            onConfirm = { refundDecision, refundAmount, cancellationReason ->
+                viewModel.cancelAdminBooking(
+                    booking.id,
+                    refundDecision,
+                    refundAmount,
+                    cancellationReason
+                )
+                adminCancellationTarget = null
+            }
+        )
+    }
     deactivateCoupon?.let { coupon ->
         AlertDialog(
             onDismissRequest = { deactivateCoupon = null },
@@ -111,6 +134,7 @@ fun StayAdminScreen(viewModel: StayAdminViewModel = hiltViewModel()) {
         when (target) {
             StayAdminPage.PENDING -> viewModel.loadBookings("pending")
             StayAdminPage.CONFIRMED -> viewModel.loadBookings("confirmed")
+            StayAdminPage.OCCUPANCY -> viewModel.loadDailyOccupancy()
             StayAdminPage.CANCELLATIONS -> viewModel.loadCancellations()
             StayAdminPage.COUPONS -> viewModel.loadCoupons()
             StayAdminPage.ARCHIVE -> viewModel.loadBookings(null)
@@ -118,11 +142,25 @@ fun StayAdminScreen(viewModel: StayAdminViewModel = hiltViewModel()) {
         }
     }
 
+    BackHandler(enabled = page == StayAdminPage.CREATE_BOOKING) {
+        page = StayAdminPage.DASHBOARD
+    }
+
     Scaffold(
         contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
         topBar = {
             TopAppBar(
                 title = { Text(page.title, fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    if (page != StayAdminPage.DASHBOARD) {
+                        IconButton(onClick = { page = StayAdminPage.DASHBOARD }) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back to Stay Admin"
+                            )
+                        }
+                    }
+                },
                 actions = {
                     IconButton(onClick = {
                         if (page == StayAdminPage.DASHBOARD) viewModel.refreshDashboard()
@@ -152,7 +190,15 @@ fun StayAdminScreen(viewModel: StayAdminViewModel = hiltViewModel()) {
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             when (page) {
-                StayAdminPage.DASHBOARD -> Dashboard(state, ::open)
+                StayAdminPage.DASHBOARD -> Dashboard(state, ::open) {
+                    page = StayAdminPage.CREATE_BOOKING
+                }
+                StayAdminPage.CREATE_BOOKING -> AdminStayBookingPage(
+                    onConfirm = {
+                        viewModel.createAdminBooking(it)
+                        page = StayAdminPage.DASHBOARD
+                    }
+                )
                 StayAdminPage.PENDING -> BookingPage(
                     state,
                     emptyMessage = "No pending requests",
@@ -170,7 +216,14 @@ fun StayAdminScreen(viewModel: StayAdminViewModel = hiltViewModel()) {
                     emptyMessage = "No confirmed bookings",
                     onSearch = { viewModel.loadBookings("confirmed", it) },
                     onLoadMore = { viewModel.loadBookings("confirmed", state.bookingSearch, false) }
-                )
+                ) { booking ->
+                    if (booking.bookingSource == "admin") {
+                        OutlinedButton(onClick = { adminCancellationTarget = booking }) {
+                            Text("Cancel booking")
+                        }
+                    }
+                }
+                StayAdminPage.OCCUPANCY -> DailyOccupancyPage(state)
                 StayAdminPage.CANCELLATIONS -> CancellationPage(
                     state,
                     onReview = { cancellationTarget = it },
@@ -235,12 +288,18 @@ private fun TextInputDialog(
 @Composable
 private fun Dashboard(
     state: StayAdminUiState,
-    onOpen: (StayAdminPage) -> Unit
+    onOpen: (StayAdminPage) -> Unit,
+    onCreateBooking: () -> Unit
 ) {
     LazyColumn(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        item {
+            Button(onClick = onCreateBooking, modifier = Modifier.fillMaxWidth()) {
+                Text("Add confirmed booking")
+            }
+        }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 DashboardCard("Pending", state.pendingTotal, Modifier.weight(1f)) {
@@ -256,8 +315,85 @@ private fun Dashboard(
                 onOpen(StayAdminPage.CONFIRMED)
             }
         }
+        item {
+            DashboardAction(
+                "Daily Occupancy",
+                "See booked and available rooms for the next 30 days"
+            ) { onOpen(StayAdminPage.OCCUPANCY) }
+        }
         item { DashboardAction("Coupons", "Create and manage Stay discount codes") { onOpen(StayAdminPage.COUPONS) } }
         item { DashboardAction("All Stay records", "Search the complete retained history") { onOpen(StayAdminPage.ARCHIVE) } }
+    }
+}
+
+@Composable
+private fun DailyOccupancyPage(state: StayAdminUiState) {
+    val report = state.dailyOccupancy
+    if (report == null && !state.isLoading) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text("No occupancy information available")
+        }
+        return
+    }
+
+    LazyColumn(
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        report?.let { occupancy ->
+            item {
+                Text(
+                    "${occupancy.fromDate} to ${occupancy.toDate}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            items(occupancy.days, key = { it.date }) { day ->
+                DailyOccupancyCard(day)
+            }
+        }
+        item { Spacer(Modifier.height(72.dp)) }
+    }
+}
+
+@Composable
+private fun DailyOccupancyCard(day: StayDailyOccupancyDay) {
+    val dateLabel = remember(day.date) {
+        runCatching {
+            LocalDate.parse(day.date)
+                .format(DateTimeFormatter.ofPattern("EEE, dd MMM yyyy"))
+        }.getOrDefault(day.date)
+    }
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            Modifier.fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    dateLabel,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    "${day.bookingCount} ${if (day.bookingCount == 1) "booking" else "bookings"}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            HorizontalDivider()
+            day.unitTypes.forEach { unit ->
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(unit.displayName, modifier = Modifier.weight(1f))
+                    Text(
+                        "${unit.bookedUnits} booked · ${unit.availableUnits} available",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -279,6 +415,185 @@ private fun DashboardAction(title: String, subtitle: String, onClick: () -> Unit
             Text(subtitle, style = MaterialTheme.typography.bodySmall)
         }
     }
+}
+
+@Composable
+private fun AdminStayBookingPage(
+    modifier: Modifier = Modifier,
+    onConfirm: (CreateStayBookingRequest) -> Unit
+) {
+    var checkInDate by remember { mutableStateOf(LocalDate.now().plusDays(1)) }
+    var checkOutDate by remember { mutableStateOf(LocalDate.now().plusDays(2)) }
+    var threeBed by remember { mutableStateOf("") }
+    var fourBed by remember { mutableStateOf("") }
+    var fiveBed by remember { mutableStateOf("") }
+    var halls by remember { mutableStateOf("") }
+    var guestCount by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf("") }
+    var phone by remember { mutableStateOf("") }
+    var coupon by remember { mutableStateOf("") }
+    var note by remember { mutableStateOf("") }
+    val quantities = listOf(
+        "three_bed_room" to threeBed.toIntOrNull(),
+        "four_bed_room" to fourBed.toIntOrNull(),
+        "five_bed_room" to fiveBed.toIntOrNull(),
+        "hall" to halls.toIntOrNull()
+    )
+    val selectedItems = quantities.filter { (it.second ?: 0) > 0 }
+        .map { StayBookingItemRequest(it.first, it.second!!) }
+    val canConfirm = !checkOutDate.isBefore(checkInDate.plusDays(1)) &&
+        selectedItems.isNotEmpty() &&
+        (guestCount.toIntOrNull() ?: 0) > 0 &&
+        name.isNotBlank() && phone.isNotBlank()
+
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        item {
+            Text(
+                "This records payment as received and confirms the booking immediately.",
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    "Stay dates and accommodation",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                CouponDateButton("Check-in", checkInDate) { selected ->
+                    checkInDate = selected
+                    if (!checkOutDate.isAfter(selected)) checkOutDate = selected.plusDays(1)
+                }
+                CouponDateButton("Check-out", checkOutDate) { checkOutDate = it }
+                QuantityField("3 Bed rooms", threeBed) { threeBed = it }
+                QuantityField("4 Bed rooms", fourBed) { fourBed = it }
+                QuantityField("5 Bed rooms", fiveBed) { fiveBed = it }
+                QuantityField("Halls", halls) { halls = it }
+            }
+        }
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Guest details", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                OutlinedTextField(
+                    value = guestCount,
+                    onValueChange = { if (it.all(Char::isDigit)) guestCount = it },
+                    label = { Text("Total guests") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(name, { name = it.take(200) }, label = { Text("Guest name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(phone, { phone = it.take(20) }, label = { Text("Phone") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone), singleLine = true, modifier = Modifier.fillMaxWidth())
+            }
+        }
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(coupon, { coupon = it.uppercase().take(50) }, label = { Text("Coupon code (optional)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(note, { note = it.take(1000) }, label = { Text("Note (optional)") }, modifier = Modifier.fillMaxWidth())
+            }
+        }
+        item {
+            Button(
+                onClick = {
+                    onConfirm(
+                        CreateStayBookingRequest(
+                            checkInDate = checkInDate.toString(),
+                            checkOutDate = checkOutDate.toString(),
+                            items = selectedItems,
+                            guestCount = guestCount.toInt(),
+                            contactName = name.trim(),
+                            // The ViewModel supplies the signed-in admin's email, as the
+                            // normal Stay flow does; no email needs to be entered here.
+                            contactEmail = "",
+                            contactPhone = phone.trim(),
+                            couponCode = coupon.trim().ifBlank { null },
+                            customerNote = note.trim().ifBlank { null }
+                        )
+                    )
+                },
+                enabled = canConfirm,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
+            ) { Text("Confirm booking") }
+        }
+        item { Spacer(Modifier.height(32.dp)) }
+    }
+}
+
+@Composable
+private fun QuantityField(label: String, value: String, onChange: (String) -> Unit) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = { if (it.all(Char::isDigit)) onChange(it.take(2)) },
+        label = { Text(label) },
+        placeholder = { Text("0") },
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth()
+    )
+}
+
+@Composable
+private fun AdminStayCancellationDialog(
+    booking: StayBooking,
+    onDismiss: () -> Unit,
+    onConfirm: (String, Double?, String?) -> Unit
+) {
+    var decision by remember(booking.id) { mutableStateOf("full") }
+    var amount by remember(booking.id) { mutableStateOf("") }
+    var reason by remember(booking.id) { mutableStateOf("") }
+    val partialAmount = amount.toDoubleOrNull()
+    val canConfirm = when (decision) {
+        "partial" -> (partialAmount ?: 0.0) > 0 && reason.isNotBlank()
+        "none" -> reason.isNotBlank()
+        else -> true
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Cancel ${booking.reference}") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Choose the refund to record. The server enforces the 48-hour refund policy.")
+                Row {
+                    listOf("full", "partial", "none").forEach { option ->
+                        FilterChip(
+                            selected = decision == option,
+                            onClick = { decision = option },
+                            label = { Text(option.replaceFirstChar(Char::uppercase)) },
+                            modifier = Modifier.padding(end = 4.dp)
+                        )
+                    }
+                }
+                if (decision == "partial") {
+                    OutlinedTextField(
+                        value = amount,
+                        onValueChange = { if (it.matches(Regex("^\\d*\\.?\\d{0,2}$"))) amount = it },
+                        label = { Text("Refund amount (₹)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        singleLine = true
+                    )
+                }
+                OutlinedTextField(
+                    value = reason,
+                    onValueChange = { reason = it.take(1000) },
+                    label = { Text(if (decision == "full") "Note (optional)" else "Reason") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Back") } },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(decision, partialAmount, reason.trim().ifBlank { null }) },
+                enabled = canConfirm
+            ) { Text("Cancel booking") }
+        }
+    )
 }
 
 @Composable

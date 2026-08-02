@@ -178,8 +178,24 @@ interface ApiService {
         @Query("limit") limit: Int? = null
     ): Response<ApiResponse<StayPage<StayBooking>>>
 
+    @POST("admin/stay/bookings")
+    suspend fun createAdminStayBooking(
+        @Body request: CreateStayBookingRequest
+    ): Response<ApiResponse<StayBooking>>
+
+    @GET("admin/stay/daily-occupancy")
+    suspend fun getStayDailyOccupancy(
+        @Query("days") days: Int = 30
+    ): Response<ApiResponse<StayDailyOccupancyReport>>
+
     @POST("admin/stay/bookings/{id}/confirm")
     suspend fun confirmStayBooking(@Path("id") id: String): Response<ApiResponse<StayBooking>>
+
+    @POST("admin/stay/bookings/{id}/cancel")
+    suspend fun cancelAdminStayBooking(
+        @Path("id") id: String,
+        @Body request: AdminStayCancellationRequest
+    ): Response<ApiResponse<StayBooking>>
 
     @POST("admin/stay/bookings/{id}/reject")
     suspend fun rejectStayBooking(

@@ -2,14 +2,18 @@ package com.mybus.app.ui.stay
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mybus.app.data.local.TokenManager
 import com.mybus.app.data.remote.dto.StayBooking
 import com.mybus.app.data.remote.dto.StayCancellation
 import com.mybus.app.data.remote.dto.StayCoupon
+import com.mybus.app.data.remote.dto.StayDailyOccupancyReport
+import com.mybus.app.data.remote.dto.CreateStayBookingRequest
 import com.mybus.app.data.repository.StayRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -24,6 +28,7 @@ data class StayAdminUiState(
     val bookingTotal: Int = 0,
     val pendingTotal: Int = 0,
     val confirmedTotal: Int = 0,
+    val dailyOccupancy: StayDailyOccupancyReport? = null,
     val cancellations: List<StayCancellation> = emptyList(),
     val cancellationPage: Int = 1,
     val cancellationTotal: Int = 0,
@@ -32,7 +37,8 @@ data class StayAdminUiState(
 
 @HiltViewModel
 class StayAdminViewModel @Inject constructor(
-    private val repository: StayRepository
+    private val repository: StayRepository,
+    private val tokenManager: TokenManager
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(StayAdminUiState())
     val uiState: StateFlow<StayAdminUiState> = _uiState
@@ -106,6 +112,20 @@ class StayAdminViewModel @Inject constructor(
         }
     }
 
+    fun loadDailyOccupancy() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            repository.getDailyOccupancy()
+                .onSuccess { report ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        dailyOccupancy = report
+                    )
+                }
+                .onFailure { showError(it, "Failed to load daily occupancy") }
+        }
+    }
+
     fun loadCoupons() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
@@ -137,6 +157,35 @@ class StayAdminViewModel @Inject constructor(
     }
 
     fun confirm(id: String) = act("Booking confirmed") { repository.confirmBooking(id) }
+
+    fun createAdminBooking(request: CreateStayBookingRequest) {
+        viewModelScope.launch {
+            val email = tokenManager.userEmail.first().orEmpty().trim()
+            if (email.isBlank()) {
+                _uiState.value = _uiState.value.copy(
+                    error = "Unable to find your login email. Please sign in again."
+                )
+                return@launch
+            }
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null, message = null)
+            repository.createAdminBooking(request.copy(contactEmail = email))
+                .onSuccess {
+                    _uiState.value = _uiState.value.copy(message = "Stay booking confirmed")
+                    refreshDashboard()
+                    loadBookings("confirmed")
+                }
+                .onFailure { showError(it, "Failed to create Stay booking") }
+        }
+    }
+
+    fun cancelAdminBooking(
+        id: String,
+        refundDecision: String,
+        refundAmount: Double?,
+        reason: String?
+    ) = act("Stay booking cancelled") {
+        repository.cancelAdminBooking(id, refundDecision, refundAmount, reason)
+    }
 
     fun reject(id: String, reason: String) = act("Booking rejected") {
         repository.rejectBooking(id, reason)

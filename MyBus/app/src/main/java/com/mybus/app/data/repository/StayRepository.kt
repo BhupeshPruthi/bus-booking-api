@@ -23,7 +23,9 @@ class StayRepository @Inject constructor(
             ?.takeIf(String::isNotBlank)
             ?.let { runCatching { errorAdapter.fromJson(it)?.error }.getOrNull() }
         val apiError = bodyError ?: parsedError
-        val serverMessage = apiError?.message?.trim()
+        val detailMessage = apiError?.details?.firstOrNull()?.message?.trim()
+        val serverMessage = detailMessage?.let(::friendlyValidationMessage)
+            ?: apiError?.message?.trim()
 
         if (!serverMessage.isNullOrBlank() &&
             !serverMessage.equals("Internal server error", ignoreCase = true)
@@ -39,6 +41,12 @@ class StayRepository @Inject constructor(
                 "(server error ${response.code()}). Please try again."
             else -> "$fallback (error ${response.code()}). Please try again."
         }
+    }
+
+    private fun friendlyValidationMessage(message: String): String = when {
+        message.contains("less than or equal to 13") ->
+            "Each room or hall category can have at most 13 units."
+        else -> message.replace(Regex("^\\\"[^\\\"]+\\\"\\s*"), "")
     }
 
     private suspend fun <T> request(
@@ -88,8 +96,28 @@ class StayRepository @Inject constructor(
         apiService.getAdminStayBookings(status, search, page, limit)
     }
 
+    suspend fun createAdminBooking(body: CreateStayBookingRequest) =
+        request("Failed to create Stay booking") { apiService.createAdminStayBooking(body) }
+
+    suspend fun getDailyOccupancy(days: Int = 30) =
+        request("Failed to load daily occupancy") {
+            apiService.getStayDailyOccupancy(days)
+        }
+
     suspend fun confirmBooking(id: String) = request("Failed to confirm booking") {
         apiService.confirmStayBooking(id)
+    }
+
+    suspend fun cancelAdminBooking(
+        id: String,
+        refundDecision: String,
+        refundAmount: Double?,
+        reason: String?
+    ) = request("Failed to cancel Stay booking") {
+        apiService.cancelAdminStayBooking(
+            id,
+            AdminStayCancellationRequest(refundDecision, refundAmount, reason)
+        )
     }
 
     suspend fun rejectBooking(id: String, reason: String) =
