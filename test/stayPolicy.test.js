@@ -21,6 +21,8 @@ const {
 } = require('../src/services/stayService').constants;
 const {
   stayCancellationDecisionSchema,
+  adminDirectStayCancellationSchema,
+  stayBookingIdParamsSchema,
   createStayBookingSchema,
 } = require('../src/validators/schemas');
 
@@ -179,4 +181,29 @@ test('late cancellations support full, partial, or no discretionary refund', () 
     refundAmount: 500,
     reason: 'Admin discretion',
   }).error, undefined);
+});
+
+test('admin direct Stay cancellations require a valid refund decision', () => {
+  assert.equal(adminDirectStayCancellationSchema.validate({
+    refundDecision: 'full',
+  }).error, undefined);
+  assert.equal(adminDirectStayCancellationSchema.validate({
+    refundDecision: 'partial',
+    refundAmount: 250,
+    reason: 'Guest requested a partial refund',
+  }).error, undefined);
+  assert.match(
+    adminDirectStayCancellationSchema.validate({ refundDecision: 'partial' }).error?.message || '',
+    /required/
+  );
+});
+
+test('admin Stay booking routes require a UUID booking id', () => {
+  assert.equal(stayBookingIdParamsSchema.validate({
+    id: '00000000-0000-0000-0000-000000000001',
+  }).error, undefined);
+  assert.match(
+    stayBookingIdParamsSchema.validate({ id: 'not-a-uuid' }).error?.message || '',
+    /valid GUID/
+  );
 });

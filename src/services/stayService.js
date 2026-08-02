@@ -326,6 +326,103 @@ class StayService {
     return this.getBookingById(bookingId, userId);
   }
 
+  // Admin-created bookings are confirmed immediately, after rechecking inventory inside
+  // the same transaction. The booking remains owned by its creating admin so it does not
+  // become a booking in the guest's My Stays feed.
+  async createAdminBooking(adminId, data) {
+    await this.completePastBookings();
+    const bookingId = await db.transaction(async (trx) => {
+      await trx.raw('SELECT pg_advisory_xact_lock(?)', [STAY_INVENTORY_ADVISORY_LOCK]);
+      const checkInDate = dateOnly(data.checkInDate, 'checkInDate');
+      const checkOutDate = dateOnly(data.checkOutDate, 'checkOutDate');
+      const nightCount = nightsBetween(checkInDate, checkOutDate);
+      const now = new Date();
+      if (checkInInstant(checkInDate) <= now) {
+        throw new ValidationError('Check-in must be in the future');
+      }
+      if (data.cancellationPolicyAccepted !== true) {
+        throw new ValidationError('Cancellation policy must be accepted');
+      }
+      const requestedItems = this.normalizeRequestedItems(data.items);
+      const types = await this.currentTypes(
+        trx,
+        requestedItems.map((item) => item.unitTypeCode)
+      );
+      if (types.length !== requestedItems.length) {
+        throw new ValidationError('One or more requested accommodation types are unavailable');
+      }
+
+      let totalAmount = 0;
+      const items = [];
+      for (const requested of requestedItems) {
+        const type = types.find((candidate) => candidate.code === requested.unitTypeCode);
+        if (requested.quantity > Number(type.total_inventory)) {
+          throw new ValidationError(
+            `${type.display_name} quantity cannot exceed ${type.total_inventory}`
+          );
+        }
+        const reserved = await this.reservedQuantity(
+          trx,
+          type.id,
+          checkInDate,
+          checkOutDate
+        );
+        const available = Number(type.total_inventory) - reserved;
+        if (requested.quantity > available) {
+          throw new ConflictError(
+            `Only ${Math.max(0, available)} ${type.display_name}(s) remain available`
+          );
+        }
+        const lineTotal = calculateLineTotal(type.nightly_rate, requested.quantity, nightCount);
+        totalAmount += lineTotal;
+        items.push({
+          unit_type_id: type.id,
+          unit_type_code: type.code,
+          unit_type_name: type.display_name,
+          quantity: requested.quantity,
+          nightly_rate: type.nightly_rate,
+          night_count: nightCount,
+          line_total: lineTotal,
+        });
+      }
+
+      const subtotalAmount = money(totalAmount);
+      const couponPricing = await stayCouponService.apply(
+        data.couponCode,
+        subtotalAmount,
+        trx,
+        now
+      );
+      const [booking] = await trx('stay_bookings').insert({
+        reference: bookingReference(now),
+        user_id: adminId,
+        booking_source: 'admin',
+        status: 'confirmed',
+        check_in_date: checkInDate,
+        check_out_date: checkOutDate,
+        night_count: nightCount,
+        guest_count: Number(data.guestCount),
+        contact_name: String(data.contactName).trim(),
+        contact_email: String(data.contactEmail).trim(),
+        contact_phone: String(data.contactPhone).trim(),
+        subtotal_amount: subtotalAmount,
+        discount_amount: couponPricing.discountAmount,
+        coupon_id: couponPricing.couponId,
+        coupon_code: couponPricing.couponCode,
+        total_amount: couponPricing.totalAmount,
+        customer_note: String(data.customerNote || '').trim() || null,
+        cancellation_policy_accepted: true,
+        confirmed_by: adminId,
+        confirmed_at: now,
+      }).returning('*');
+      await trx('stay_booking_items').insert(
+        items.map((item) => ({ ...item, booking_id: booking.id }))
+      );
+      return booking.id;
+    });
+    return this.getBookingById(bookingId);
+  }
+
   async confirmBooking(bookingId, adminId) {
     await this.completePastBookings();
     await db.transaction(async (trx) => {
@@ -485,6 +582,68 @@ class StayService {
         decided_by: adminId,
         decided_at: now,
         updated_at: now,
+      });
+      await trx('stay_bookings').where('id', booking.id).update({
+        status: 'cancelled',
+        updated_at: now,
+      });
+    });
+    return this.getBookingById(bookingId);
+  }
+
+  // This is deliberately limited to bookings explicitly created through the admin
+  // flow. Customer cancellations continue through the normal request-and-decision
+  // workflow, even when another Stay Admin is on duty.
+  async cancelAdminBooking(bookingId, adminId, data) {
+    await this.completePastBookings();
+    await db.transaction(async (trx) => {
+      const booking = await trx('stay_bookings')
+        .where('id', bookingId)
+        .forUpdate()
+        .first();
+      if (!booking) throw new NotFoundError('Admin Stay booking');
+      if (booking.booking_source !== 'admin') {
+        throw new ValidationError('Only admin-created Stay bookings can be cancelled immediately');
+      }
+      if (booking.status !== 'confirmed') {
+        throw new ValidationError(`Cannot cancel booking with status: ${booking.status}`);
+      }
+      const checkInDate = databaseDateOnly(booking.check_in_date, 'check_in_date');
+      const now = new Date();
+      if (checkInInstant(checkInDate) <= now) {
+        throw new ValidationError('Cancellation cannot be requested after check-in has started');
+      }
+      const eligibility = refundEligibility(checkInDate, now);
+      const total = money(booking.total_amount);
+      const decision = data.refundDecision;
+      const refundAmount = decision === 'full'
+        ? total
+        : decision === 'partial'
+          ? money(data.refundAmount)
+          : 0;
+      if (refundAmount < 0 || refundAmount > total) {
+        throw new ValidationError(`Refund amount must be between ₹0 and ₹${total}`);
+      }
+      if (eligibility.standardFullRefundEligible && decision !== 'full') {
+        throw new ValidationError('This request is entitled to a full refund');
+      }
+      const reason = String(data.reason || '').trim() || null;
+      if (decision !== 'full' && !reason) {
+        throw new ValidationError('A reason is required when a full refund is not granted');
+      }
+      await trx('stay_cancellation_requests').insert({
+        booking_id: booking.id,
+        status: 'approved',
+        previous_booking_status: booking.status,
+        reason,
+        requested_at: now,
+        standard_full_refund_eligible: eligibility.standardFullRefundEligible,
+        hours_before_check_in: eligibility.hoursBeforeCheckIn,
+        refund_decision: decision,
+        refund_amount: refundAmount,
+        decision_reason: reason,
+        decided_by: adminId,
+        decided_at: now,
       });
       await trx('stay_bookings').where('id', booking.id).update({
         status: 'cancelled',
@@ -746,6 +905,7 @@ class StayService {
       id: row.id,
       reference: row.reference,
       userId: row.user_id,
+      bookingSource: row.booking_source,
       status: row.status,
       checkInDate: databaseDateOnly(row.check_in_date, 'check_in_date'),
       checkOutDate: databaseDateOnly(row.check_out_date, 'check_out_date'),

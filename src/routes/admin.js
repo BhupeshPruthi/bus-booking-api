@@ -20,10 +20,13 @@ const {
   createEventSchema,
   adminCancelPoojaBookingSchema,
   stayBookingListSchema,
+  stayBookingIdParamsSchema,
   stayDailyOccupancySchema,
   stayCancellationListSchema,
   stayRejectionSchema,
   stayCancellationDecisionSchema,
+  adminDirectStayCancellationSchema,
+  createStayBookingSchema,
   createStayCouponSchema,
   feedbackListSchema,
 } = require('../validators/schemas');
@@ -166,11 +169,35 @@ router.get(
   validate(stayBookingListSchema, 'query'),
   stayAdminController.getBookings
 );
-router.get('/stay/bookings/:id', stayAdminOrSuperUser, stayAdminController.getBooking);
-router.post('/stay/bookings/:id/confirm', stayAdminOrSuperUser, stayAdminController.confirmBooking);
+router.post(
+  '/stay/bookings',
+  stayAdminOrSuperUser,
+  validate(createStayBookingSchema),
+  stayAdminController.createAdminBooking
+);
+router.get(
+  '/stay/bookings/:id',
+  stayAdminOrSuperUser,
+  validate(stayBookingIdParamsSchema, 'params'),
+  stayAdminController.getBooking
+);
+router.post(
+  '/stay/bookings/:id/cancel',
+  stayAdminOrSuperUser,
+  validate(stayBookingIdParamsSchema, 'params'),
+  validate(adminDirectStayCancellationSchema),
+  stayAdminController.cancelAdminBooking
+);
+router.post(
+  '/stay/bookings/:id/confirm',
+  stayAdminOrSuperUser,
+  validate(stayBookingIdParamsSchema, 'params'),
+  stayAdminController.confirmBooking
+);
 router.post(
   '/stay/bookings/:id/reject',
   stayAdminOrSuperUser,
+  validate(stayBookingIdParamsSchema, 'params'),
   validate(stayRejectionSchema),
   stayAdminController.rejectBooking
 );

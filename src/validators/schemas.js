@@ -239,6 +239,10 @@ const stayBookingListSchema = Joi.object({
   search: Joi.string().max(200).trim(),
 }).concat(paginationSchema);
 
+const stayBookingIdParamsSchema = Joi.object({
+  id: uuidSchema.required(),
+});
+
 const stayDailyOccupancySchema = Joi.object({
   fromDate: stayDateSchema.optional(),
   days: Joi.number().integer().min(1).max(90).default(30),
@@ -287,6 +291,16 @@ const stayCancellationDecisionSchema = Joi.object({
     then: Joi.string().max(1000).trim().required(),
     otherwise: Joi.string().max(1000).allow('', null).trim(),
   }),
+});
+
+const adminDirectStayCancellationSchema = Joi.object({
+  refundDecision: Joi.string().valid('full', 'partial', 'none').required(),
+  refundAmount: Joi.when('refundDecision', {
+    is: 'partial',
+    then: Joi.number().min(0.01).precision(2).required(),
+    otherwise: Joi.number().min(0).precision(2),
+  }),
+  reason: Joi.string().max(1000).allow('', null).trim(),
 });
 
 const createStayCouponSchema = Joi.object({
@@ -368,6 +382,7 @@ module.exports = {
   stayQuoteSchema,
   createStayBookingSchema,
   stayBookingListSchema,
+  stayBookingIdParamsSchema,
   stayDailyOccupancySchema,
   unifiedBookingListSchema,
   unifiedBookingDetailSchema,
@@ -375,6 +390,7 @@ module.exports = {
   stayCancellationListSchema,
   stayRejectionSchema,
   stayCancellationDecisionSchema,
+  adminDirectStayCancellationSchema,
   createStayCouponSchema,
 
   // Events

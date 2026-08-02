@@ -11,6 +11,10 @@ const getDailyOccupancy = asyncHandler(async (req, res) => {
 const getBooking = asyncHandler(async (req, res) => {
   res.json({ success: true, data: await stayService.getBookingById(req.params.id) });
 });
+const createAdminBooking = asyncHandler(async (req, res) => {
+  const booking = await stayService.createAdminBooking(req.user.id, req.body);
+  res.status(201).json({ success: true, data: booking });
+});
 const confirmBooking = asyncHandler(async (req, res) => {
   res.json({ success: true, data: await stayService.confirmBooking(req.params.id, req.user.id) });
 });
@@ -29,6 +33,12 @@ const decideCancellation = asyncHandler(async (req, res) => {
     data: await stayService.decideCancellation(req.params.id, req.user.id, req.body),
   });
 });
+const cancelAdminBooking = asyncHandler(async (req, res) => {
+  res.json({
+    success: true,
+    data: await stayService.cancelAdminBooking(req.params.id, req.user.id, req.body),
+  });
+});
 const getCoupons = asyncHandler(async (req, res) => {
   res.json({ success: true, data: await stayCouponService.list() });
 });
@@ -43,10 +53,12 @@ module.exports = {
   getBookings,
   getDailyOccupancy,
   getBooking,
+  createAdminBooking,
   confirmBooking,
   rejectBooking,
   getCancellations,
   decideCancellation,
+  cancelAdminBooking,
   getCoupons,
   createCoupon,
   deactivateCoupon,
