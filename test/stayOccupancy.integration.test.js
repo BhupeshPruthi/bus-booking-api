@@ -111,10 +111,10 @@ test('daily occupancy executes against PostgreSQL with checkout-exclusive status
       { id: TYPE_IDS.hall, code: 'hall', display_name: 'Hall', capacity: 25, total_inventory: 3, nightly_rate: 3500, display_order: 4, is_active: false },
     ]);
     await db('stay_bookings').insert([
-      { id: '00000000-0000-0000-0000-000000000101', status: 'confirmed', check_in_date: fromDate, check_out_date: dayThree, confirmed_at: now },
-      { id: '00000000-0000-0000-0000-000000000102', status: 'cancellation_requested', check_in_date: dayTwo, check_out_date: dayFour, confirmed_at: now },
-      { id: '00000000-0000-0000-0000-000000000103', status: 'cancelled', check_in_date: dayTwo, check_out_date: dayFour, confirmed_at: now },
-      { id: '00000000-0000-0000-0000-000000000104', status: 'confirmed', check_in_date: fromDate, check_out_date: dayTwo, confirmed_at: now },
+      { id: '00000000-0000-0000-0000-000000000101', status: 'confirmed', check_in_date: fromDate, check_out_date: dayThree, night_count: 2, total_amount: 2400, confirmed_at: now },
+      { id: '00000000-0000-0000-0000-000000000102', status: 'cancellation_requested', check_in_date: dayTwo, check_out_date: dayFour, night_count: 2, total_amount: 3000, confirmed_at: now },
+      { id: '00000000-0000-0000-0000-000000000103', status: 'cancelled', check_in_date: dayTwo, check_out_date: dayFour, night_count: 2, total_amount: 10500, confirmed_at: now },
+      { id: '00000000-0000-0000-0000-000000000104', status: 'confirmed', check_in_date: fromDate, check_out_date: dayTwo, night_count: 1, total_amount: 3500, confirmed_at: now },
     ]);
     await db('stay_booking_items').insert([
       { id: '00000000-0000-0000-0000-000000000201', booking_id: '00000000-0000-0000-0000-000000000101', unit_type_id: TYPE_IDS.threeBed, quantity: 2 },
@@ -129,16 +129,19 @@ test('daily occupancy executes against PostgreSQL with checkout-exclusive status
     const dayThreeReport = report.days[2];
 
     assert.equal(dayOne.bookingCount, 2);
+    assert.equal(dayOne.totalEarnings, 4700);
     assert.deepEqual(
       dayOne.unitTypes.map((unit) => [unit.code, unit.bookedUnits]),
       [['three_bed_room', 2], ['four_bed_room', 0], ['five_bed_room', 0], ['hall', 1]]
     );
     assert.equal(dayTwoReport.bookingCount, 2);
+    assert.equal(dayTwoReport.totalEarnings, 1200);
     assert.deepEqual(
       dayTwoReport.unitTypes.map((unit) => [unit.code, unit.bookedUnits]),
       [['three_bed_room', 2], ['four_bed_room', 1], ['five_bed_room', 0], ['hall', 0]]
     );
     assert.equal(dayThreeReport.bookingCount, 1);
+    assert.equal(dayThreeReport.totalEarnings, 0);
     assert.equal(dayThreeReport.unitTypes.find((unit) => unit.code === 'four_bed_room').bookedUnits, 1);
   } finally {
     await db.schema.dropTableIfExists('stay_cancellation_requests');

@@ -135,6 +135,7 @@ function formatDailyOccupancy(fromDate, toDate, rows) {
       day = {
         date,
         bookingCount: Number(row.booking_count || 0),
+        totalEarnings: money(row.total_earnings || 0),
         unitTypes: [],
       };
       byDate.set(date, day);
@@ -732,6 +733,21 @@ class StayService {
          AND booking.status IN ('confirmed', 'cancellation_requested')
         GROUP BY day.occupancy_date
       ),
+      daily_earnings AS (
+        SELECT
+          day.occupancy_date,
+          COALESCE(
+            SUM(booking.total_amount / NULLIF(booking.night_count, 0)),
+            0
+          )::numeric(12, 2) AS total_earnings
+        FROM days day
+        LEFT JOIN stay_bookings booking
+          ON booking.check_in_date <= day.occupancy_date
+         AND booking.check_out_date > day.occupancy_date
+         AND booking.confirmed_at IS NOT NULL
+         AND booking.status = 'confirmed'
+        GROUP BY day.occupancy_date
+      ),
       report_unit_types AS (
         SELECT type.*
         FROM stay_unit_types type
@@ -748,7 +764,8 @@ class StayService {
         type.display_name,
         type.total_inventory,
         COALESCE(occupied.booked_units, 0)::integer AS booked_units,
-        counts.booking_count
+        counts.booking_count,
+        earnings.total_earnings
       FROM days day
       CROSS JOIN report_unit_types type
       LEFT JOIN occupied_units occupied
@@ -756,6 +773,8 @@ class StayService {
        AND occupied.unit_type_id = type.id
       JOIN daily_booking_counts counts
         ON counts.occupancy_date = day.occupancy_date
+      JOIN daily_earnings earnings
+        ON earnings.occupancy_date = day.occupancy_date
       ORDER BY day.occupancy_date ASC, type.display_order ASC, type.code ASC
     `, [fromDate, toDate]);
 
