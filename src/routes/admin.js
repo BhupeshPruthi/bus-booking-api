@@ -20,6 +20,7 @@ const {
   createEventSchema,
   adminCancelPoojaBookingSchema,
   stayBookingListSchema,
+  stayDailyOccupancySchema,
   stayCancellationListSchema,
   stayRejectionSchema,
   stayCancellationDecisionSchema,
@@ -150,6 +151,13 @@ router.post(
   '/stay/coupons/:id/deactivate',
   stayAdminOrSuperUser,
   stayAdminController.deactivateCoupon
+);
+
+router.get(
+  '/stay/daily-occupancy',
+  stayAdminOrSuperUser,
+  validate(stayDailyOccupancySchema, 'query'),
+  stayAdminController.getDailyOccupancy
 );
 
 router.get(

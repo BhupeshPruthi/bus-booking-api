@@ -15,6 +15,8 @@ const UNIT_TYPE_CODES = ['three_bed_room', 'four_bed_room', 'five_bed_room', 'ha
 const INVENTORY_HOLDING_STATUSES = ['confirmed', 'cancellation_requested'];
 const TERMINAL_STATUSES = ['rejected', 'cancelled', 'completed'];
 const STAY_INVENTORY_ADVISORY_LOCK = 20260725;
+const DEFAULT_OCCUPANCY_DAYS = 30;
+const MAX_OCCUPANCY_DAYS = 90;
 
 function dateOnly(value, fieldName) {
   const text = String(value || '');
@@ -91,6 +93,66 @@ function cancellationTransition(status) {
     return { bookingStatus: 'cancellation_requested', requestStatus: 'pending' };
   }
   return null;
+}
+
+function indiaDateOnly(now = new Date()) {
+  return new Date(now.getTime() + (330 * 60 * 1000)).toISOString().slice(0, 10);
+}
+
+function addCalendarDays(date, days) {
+  const instant = new Date(`${date}T00:00:00.000Z`);
+  instant.setUTCDate(instant.getUTCDate() + days);
+  return instant.toISOString().slice(0, 10);
+}
+
+function dailyOccupancyRange(filters = {}, now = new Date()) {
+  const today = indiaDateOnly(now);
+  const fromDate = dateOnly(filters.fromDate || today, 'fromDate');
+  if (fromDate < today) {
+    throw new ValidationError('fromDate cannot be before today in India');
+  }
+
+  const dayCount = Number(filters.days ?? DEFAULT_OCCUPANCY_DAYS);
+  if (!Number.isInteger(dayCount) || dayCount < 1 || dayCount > MAX_OCCUPANCY_DAYS) {
+    throw new ValidationError(`days must be between 1 and ${MAX_OCCUPANCY_DAYS}`);
+  }
+
+  return {
+    fromDate,
+    toDate: addCalendarDays(fromDate, dayCount - 1),
+    dayCount,
+  };
+}
+
+function formatDailyOccupancy(fromDate, toDate, rows) {
+  const days = [];
+  const byDate = new Map();
+
+  for (const row of rows) {
+    const date = databaseDateOnly(row.occupancy_date, 'occupancy_date');
+    let day = byDate.get(date);
+    if (!day) {
+      day = {
+        date,
+        bookingCount: Number(row.booking_count || 0),
+        unitTypes: [],
+      };
+      byDate.set(date, day);
+      days.push(day);
+    }
+
+    const bookedUnits = Number(row.booked_units || 0);
+    const totalUnits = Number(row.total_inventory || 0);
+    day.unitTypes.push({
+      code: row.code,
+      displayName: row.display_name,
+      bookedUnits,
+      totalUnits,
+      availableUnits: Math.max(0, totalUnits - bookedUnits),
+    });
+  }
+
+  return { fromDate, toDate, days };
 }
 
 function bookingReference(now = new Date()) {
@@ -478,6 +540,69 @@ class StayService {
     return this.listBookings(filters);
   }
 
+  async getDailyOccupancy(filters = {}) {
+    await this.completePastBookings();
+    const { fromDate, toDate } = dailyOccupancyRange(filters);
+    const result = await db.raw(`
+      WITH days AS (
+        SELECT generate_series(?::date, ?::date, INTERVAL '1 day')::date AS occupancy_date
+      ),
+      occupied_units AS (
+        SELECT
+          day.occupancy_date,
+          item.unit_type_id,
+          SUM(item.quantity)::integer AS booked_units
+        FROM days day
+        JOIN stay_bookings booking
+          ON booking.check_in_date <= day.occupancy_date
+         AND booking.check_out_date > day.occupancy_date
+         AND booking.confirmed_at IS NOT NULL
+         AND booking.status IN ('confirmed', 'cancellation_requested')
+        JOIN stay_booking_items item ON item.booking_id = booking.id
+        GROUP BY day.occupancy_date, item.unit_type_id
+      ),
+      daily_booking_counts AS (
+        SELECT
+          day.occupancy_date,
+          COUNT(DISTINCT booking.id)::integer AS booking_count
+        FROM days day
+        LEFT JOIN stay_bookings booking
+          ON booking.check_in_date <= day.occupancy_date
+         AND booking.check_out_date > day.occupancy_date
+         AND booking.confirmed_at IS NOT NULL
+         AND booking.status IN ('confirmed', 'cancellation_requested')
+        GROUP BY day.occupancy_date
+      ),
+      report_unit_types AS (
+        SELECT type.*
+        FROM stay_unit_types type
+        WHERE type.is_active = true
+           OR EXISTS (
+             SELECT 1
+             FROM occupied_units occupied
+             WHERE occupied.unit_type_id = type.id
+           )
+      )
+      SELECT
+        day.occupancy_date,
+        type.code,
+        type.display_name,
+        type.total_inventory,
+        COALESCE(occupied.booked_units, 0)::integer AS booked_units,
+        counts.booking_count
+      FROM days day
+      CROSS JOIN report_unit_types type
+      LEFT JOIN occupied_units occupied
+        ON occupied.occupancy_date = day.occupancy_date
+       AND occupied.unit_type_id = type.id
+      JOIN daily_booking_counts counts
+        ON counts.occupancy_date = day.occupancy_date
+      ORDER BY day.occupancy_date ASC, type.display_order ASC, type.code ASC
+    `, [fromDate, toDate]);
+
+    return formatDailyOccupancy(fromDate, toDate, result.rows);
+  }
+
   async listBookings(filters = {}) {
     let base = db('stay_bookings as b');
     if (filters.userId) base = base.where('b.user_id', filters.userId);
@@ -691,6 +816,8 @@ module.exports.constants = {
   UNIT_TYPE_CODES,
   INVENTORY_HOLDING_STATUSES,
   TERMINAL_STATUSES,
+  DEFAULT_OCCUPANCY_DAYS,
+  MAX_OCCUPANCY_DAYS,
 };
 module.exports.helpers = {
   dateOnly,
@@ -702,4 +829,8 @@ module.exports.helpers = {
   calculateLineTotal,
   cancellationTransition,
   refundEligibility,
+  indiaDateOnly,
+  addCalendarDays,
+  dailyOccupancyRange,
+  formatDailyOccupancy,
 };

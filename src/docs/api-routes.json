@@ -55,6 +55,7 @@
     { "method": "GET", "path": "/api/admin/stay/coupons", "auth": "bearer+stayAdmin", "group": "stay-admin" },
     { "method": "POST", "path": "/api/admin/stay/coupons", "auth": "bearer+stayAdmin", "group": "stay-admin" },
     { "method": "POST", "path": "/api/admin/stay/coupons/:id/deactivate", "auth": "bearer+stayAdmin", "group": "stay-admin" },
+    { "method": "GET", "path": "/api/admin/stay/daily-occupancy", "auth": "bearer+stayAdmin", "group": "stay-admin" },
     { "method": "GET", "path": "/api/admin/stay/bookings", "auth": "bearer+stayAdmin", "group": "stay-admin" },
     { "method": "GET", "path": "/api/admin/stay/bookings/:id", "auth": "bearer+stayAdmin", "group": "stay-admin" },
     { "method": "POST", "path": "/api/admin/stay/bookings/:id/confirm", "auth": "bearer+stayAdmin", "group": "stay-admin" },
@@ -102,6 +103,7 @@
       "admin/stay/bookings/{id}/reject",
       "admin/stay/coupons",
       "admin/stay/coupons/{id}/deactivate",
+      "admin/stay/daily-occupancy",
       "admin/stay/cancellation-requests",
       "admin/stay/cancellation-requests/{id}/decision"
     ]

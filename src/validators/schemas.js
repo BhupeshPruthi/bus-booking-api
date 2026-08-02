@@ -239,6 +239,11 @@ const stayBookingListSchema = Joi.object({
   search: Joi.string().max(200).trim(),
 }).concat(paginationSchema);
 
+const stayDailyOccupancySchema = Joi.object({
+  fromDate: stayDateSchema.optional(),
+  days: Joi.number().integer().min(1).max(90).default(30),
+});
+
 const stayCancellationSchema = Joi.object({
   reason: Joi.string().max(1000).allow('', null).trim(),
 });
@@ -363,6 +368,7 @@ module.exports = {
   stayQuoteSchema,
   createStayBookingSchema,
   stayBookingListSchema,
+  stayDailyOccupancySchema,
   unifiedBookingListSchema,
   unifiedBookingDetailSchema,
   stayCancellationSchema,

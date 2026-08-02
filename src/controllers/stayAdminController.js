@@ -5,6 +5,9 @@ const asyncHandler = require('../utils/asyncHandler');
 const getBookings = asyncHandler(async (req, res) => {
   res.json({ success: true, data: await stayService.getAdminBookings(req.query) });
 });
+const getDailyOccupancy = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: await stayService.getDailyOccupancy(req.query) });
+});
 const getBooking = asyncHandler(async (req, res) => {
   res.json({ success: true, data: await stayService.getBookingById(req.params.id) });
 });
@@ -38,6 +41,7 @@ const deactivateCoupon = asyncHandler(async (req, res) => {
 });
 module.exports = {
   getBookings,
+  getDailyOccupancy,
   getBooking,
   confirmBooking,
   rejectBooking,
