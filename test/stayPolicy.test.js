@@ -15,6 +15,7 @@ const {
   calculateLineTotal,
   cancellationTransition,
   refundEligibility,
+  isCheckInDateBookable,
 } = require('../src/services/stayService').helpers;
 const {
   INVENTORY_HOLDING_STATUSES,
@@ -102,6 +103,14 @@ test('Stay nights use checkout-exclusive calendar dates', () => {
 test('Stay check-in is noon and checkout is 11 AM India time', () => {
   assert.equal(checkInInstant('2026-08-01').toISOString(), '2026-08-01T06:30:00.000Z');
   assert.equal(checkoutInstant('2026-08-02').toISOString(), '2026-08-02T05:30:00.000Z');
+});
+
+test('Stay bookings remain available through the India check-in date', () => {
+  const afterCheckInOnSelectedDate = new Date('2026-08-01T12:00:00.000Z'); // 5:30 PM IST
+  const nextIndiaDay = new Date('2026-08-01T18:30:00.000Z'); // 12:00 AM IST on 2 Aug
+
+  assert.equal(isCheckInDateBookable('2026-08-01', afterCheckInOnSelectedDate), true);
+  assert.equal(isCheckInDateBookable('2026-08-01', nextIndiaDay), false);
 });
 
 test('PostgreSQL DATE values retain their calendar date', () => {

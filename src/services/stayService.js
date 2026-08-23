@@ -99,6 +99,10 @@ function indiaDateOnly(now = new Date()) {
   return new Date(now.getTime() + (330 * 60 * 1000)).toISOString().slice(0, 10);
 }
 
+function isCheckInDateBookable(checkInDate, now = new Date()) {
+  return checkInDate >= indiaDateOnly(now);
+}
+
 function addCalendarDays(date, days) {
   const instant = new Date(`${date}T00:00:00.000Z`);
   instant.setUTCDate(instant.getUTCDate() + days);
@@ -256,8 +260,8 @@ class StayService {
       const checkOutDate = dateOnly(data.checkOutDate, 'checkOutDate');
       const nightCount = nightsBetween(checkInDate, checkOutDate);
       const now = new Date();
-      if (checkInInstant(checkInDate) <= now) {
-        throw new ValidationError('Check-in must be in the future');
+      if (!isCheckInDateBookable(checkInDate, now)) {
+        throw new ValidationError('Check-in date cannot be in the past');
       }
       if (data.cancellationPolicyAccepted !== true) {
         throw new ValidationError('Cancellation policy must be accepted');
@@ -338,8 +342,8 @@ class StayService {
       const checkOutDate = dateOnly(data.checkOutDate, 'checkOutDate');
       const nightCount = nightsBetween(checkInDate, checkOutDate);
       const now = new Date();
-      if (checkInInstant(checkInDate) <= now) {
-        throw new ValidationError('Check-in must be in the future');
+      if (!isCheckInDateBookable(checkInDate, now)) {
+        throw new ValidationError('Check-in date cannot be in the past');
       }
       if (data.cancellationPolicyAccepted !== true) {
         throw new ValidationError('Cancellation policy must be accepted');
@@ -435,8 +439,8 @@ class StayService {
       }
       const checkInDate = databaseDateOnly(booking.check_in_date, 'check_in_date');
       const checkOutDate = databaseDateOnly(booking.check_out_date, 'check_out_date');
-      if (checkInInstant(checkInDate) <= new Date()) {
-        throw new ValidationError('Cannot confirm a booking after check-in has started');
+      if (!isCheckInDateBookable(checkInDate)) {
+        throw new ValidationError('Cannot confirm a booking after the check-in date has passed');
       }
       const items = await trx('stay_booking_items').where('booking_id', bookingId);
       for (const item of items) {
@@ -1009,6 +1013,7 @@ module.exports.helpers = {
   cancellationTransition,
   refundEligibility,
   indiaDateOnly,
+  isCheckInDateBookable,
   addCalendarDays,
   dailyOccupancyRange,
   formatDailyOccupancy,
