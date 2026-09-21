@@ -9,6 +9,8 @@ const {
   buildBusDeletionResult,
 } = require('./busDeletionPolicy');
 
+const ADMIN_ACTIVE_BUS_GRACE_MS = 24 * 60 * 60 * 1000;
+
 class BusService {
   /**
    * Create a new bus trip
@@ -41,6 +43,7 @@ class BusService {
   async getAllBuses(filters = {}) {
     let query = db('buses')
       .join('routes', 'buses.route_id', 'routes.id')
+      .leftJoin({ return_buses: 'buses' }, 'buses.return_bus_id', 'return_buses.id')
       .select(
         'buses.*',
         'routes.name as route_name',
@@ -54,6 +57,27 @@ class BusService {
 
     if (filters.status) {
       query = query.where('buses.status', filters.status);
+    }
+
+    // The existing admin app requests status=scheduled for its "Active Buses"
+    // screen. Apply the same 24-hour grace window on the server before
+    // pagination so stale scheduled rows cannot hide future trips on later
+    // pages. For round trips, keep both linked rows active through the later
+    // arrival of either leg.
+    if (filters.status === 'scheduled') {
+      const cutoff = new Date(Date.now() - ADMIN_ACTIVE_BUS_GRACE_MS);
+      query = query.whereRaw(
+        `GREATEST(
+          COALESCE(buses.arrival_time, buses.departure_time),
+          COALESCE(
+            return_buses.arrival_time,
+            return_buses.departure_time,
+            buses.arrival_time,
+            buses.departure_time
+          )
+        ) > ?`,
+        [cutoff]
+      );
     }
 
     if (filters.date) {
