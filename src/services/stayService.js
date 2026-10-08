@@ -13,10 +13,14 @@ const CHECK_OUT_HOUR_IST = 11;
 const MAX_NIGHTS = 7;
 const UNIT_TYPE_CODES = ['three_bed_room', 'four_bed_room', 'five_bed_room', 'hall'];
 const INVENTORY_HOLDING_STATUSES = ['confirmed', 'cancellation_requested'];
+const OCCUPANCY_REPORT_STATUSES = [...INVENTORY_HOLDING_STATUSES, 'completed'];
+const EARNED_STAY_STATUSES = ['confirmed', 'completed'];
 const TERMINAL_STATUSES = ['rejected', 'cancelled', 'completed'];
 const STAY_INVENTORY_ADVISORY_LOCK = 20260725;
 const DEFAULT_OCCUPANCY_DAYS = 30;
 const MAX_OCCUPANCY_DAYS = 90;
+const PAST_OCCUPANCY_MONTHS = 3;
+const FUTURE_OCCUPANCY_MONTHS = 1;
 
 function dateOnly(value, fieldName) {
   const text = String(value || '');
@@ -109,13 +113,36 @@ function addCalendarDays(date, days) {
   return instant.toISOString().slice(0, 10);
 }
 
+function addCalendarMonths(date, months) {
+  const [year, month, day] = dateOnly(date, 'date').split('-').map(Number);
+  const targetMonthStart = new Date(Date.UTC(year, (month - 1) + months, 1));
+  const targetYear = targetMonthStart.getUTCFullYear();
+  const targetMonth = targetMonthStart.getUTCMonth();
+  const lastDay = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(targetYear, targetMonth, Math.min(day, lastDay)))
+    .toISOString()
+    .slice(0, 10);
+}
+
+function inclusiveCalendarDays(fromDate, toDate) {
+  const start = Date.parse(`${fromDate}T00:00:00.000Z`);
+  const end = Date.parse(`${toDate}T00:00:00.000Z`);
+  return Math.round((end - start) / 86400000) + 1;
+}
+
 function dailyOccupancyRange(filters = {}, now = new Date()) {
   const today = indiaDateOnly(now);
-  const fromDate = dateOnly(filters.fromDate || today, 'fromDate');
-  if (fromDate < today) {
-    throw new ValidationError('fromDate cannot be before today in India');
+  if (filters.fromDate === undefined && filters.days === undefined) {
+    const fromDate = addCalendarMonths(today, -PAST_OCCUPANCY_MONTHS);
+    const toDate = addCalendarMonths(today, FUTURE_OCCUPANCY_MONTHS);
+    return {
+      fromDate,
+      toDate,
+      dayCount: inclusiveCalendarDays(fromDate, toDate),
+    };
   }
 
+  const fromDate = dateOnly(filters.fromDate || today, 'fromDate');
   const dayCount = Number(filters.days ?? DEFAULT_OCCUPANCY_DAYS);
   if (!Number.isInteger(dayCount) || dayCount < 1 || dayCount > MAX_OCCUPANCY_DAYS) {
     throw new ValidationError(`days must be between 1 and ${MAX_OCCUPANCY_DAYS}`);
@@ -721,7 +748,7 @@ class StayService {
           ON booking.check_in_date <= day.occupancy_date
          AND booking.check_out_date > day.occupancy_date
          AND booking.confirmed_at IS NOT NULL
-         AND booking.status IN ('confirmed', 'cancellation_requested')
+         AND booking.status IN ('confirmed', 'cancellation_requested', 'completed')
         JOIN stay_booking_items item ON item.booking_id = booking.id
         GROUP BY day.occupancy_date, item.unit_type_id
       ),
@@ -734,7 +761,7 @@ class StayService {
           ON booking.check_in_date <= day.occupancy_date
          AND booking.check_out_date > day.occupancy_date
          AND booking.confirmed_at IS NOT NULL
-         AND booking.status IN ('confirmed', 'cancellation_requested')
+         AND booking.status IN ('confirmed', 'cancellation_requested', 'completed')
         GROUP BY day.occupancy_date
       ),
       daily_earnings AS (
@@ -749,7 +776,7 @@ class StayService {
           ON booking.check_in_date <= day.occupancy_date
          AND booking.check_out_date > day.occupancy_date
          AND booking.confirmed_at IS NOT NULL
-         AND booking.status = 'confirmed'
+         AND booking.status IN ('confirmed', 'completed')
         GROUP BY day.occupancy_date
       ),
       report_unit_types AS (
@@ -783,6 +810,65 @@ class StayService {
     `, [fromDate, toDate]);
 
     return formatDailyOccupancy(fromDate, toDate, result.rows);
+  }
+
+  async getDailyOccupancyBookings(date) {
+    const occupancyDate = dateOnly(date, 'date');
+    const report = await this.getDailyOccupancy({ fromDate: occupancyDate, days: 1 });
+    const rows = await db('stay_bookings as b')
+      .whereNotNull('b.confirmed_at')
+      .whereIn('b.status', OCCUPANCY_REPORT_STATUSES)
+      .where('b.check_in_date', '<=', occupancyDate)
+      .where('b.check_out_date', '>', occupancyDate)
+      .select('b.*')
+      .orderByRaw('CASE WHEN b.check_in_date = ? THEN 0 ELSE 1 END', [occupancyDate])
+      .orderBy('b.created_at', 'desc')
+      .orderBy('b.reference', 'asc');
+
+    const ids = rows.map((row) => row.id);
+    const [items, cancellations] = ids.length
+      ? await Promise.all([
+        db('stay_booking_items')
+          .whereIn('booking_id', ids)
+          .orderBy('created_at', 'asc'),
+        db('stay_cancellation_requests')
+          .whereIn('booking_id', ids)
+          .orderBy('requested_at', 'desc'),
+      ])
+      : [[], []];
+    const latestCancellationByBooking = new Map();
+    for (const cancellation of cancellations) {
+      if (!latestCancellationByBooking.has(cancellation.booking_id)) {
+        latestCancellationByBooking.set(cancellation.booking_id, cancellation);
+      }
+    }
+
+    const day = report.days[0] || {
+      date: occupancyDate,
+      bookingCount: 0,
+      totalEarnings: 0,
+      unitTypes: [],
+    };
+    return {
+      ...day,
+      bookings: rows.map((row) => {
+        const bookingItems = items.filter((item) => item.booking_id === row.id);
+        return {
+          ...this.formatBooking(
+            row,
+            bookingItems,
+            latestCancellationByBooking.get(row.id) || null
+          ),
+          totalAccommodationUnits: bookingItems.reduce(
+            (total, item) => total + Number(item.quantity || 0),
+            0
+          ),
+          dailyEarningsContribution: EARNED_STAY_STATUSES.includes(row.status)
+            ? money(Number(row.total_amount) / Number(row.night_count))
+            : null,
+        };
+      }),
+    };
   }
 
   async listBookings(filters = {}) {
@@ -998,9 +1084,13 @@ module.exports.constants = {
   MAX_NIGHTS,
   UNIT_TYPE_CODES,
   INVENTORY_HOLDING_STATUSES,
+  OCCUPANCY_REPORT_STATUSES,
+  EARNED_STAY_STATUSES,
   TERMINAL_STATUSES,
   DEFAULT_OCCUPANCY_DAYS,
   MAX_OCCUPANCY_DAYS,
+  PAST_OCCUPANCY_MONTHS,
+  FUTURE_OCCUPANCY_MONTHS,
 };
 module.exports.helpers = {
   dateOnly,
@@ -1015,6 +1105,8 @@ module.exports.helpers = {
   indiaDateOnly,
   isCheckInDateBookable,
   addCalendarDays,
+  addCalendarMonths,
+  inclusiveCalendarDays,
   dailyOccupancyRange,
   formatDailyOccupancy,
 };

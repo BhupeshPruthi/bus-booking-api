@@ -122,6 +122,10 @@ function makeQuery(table, fixture) {
       updateData = data;
       return query;
     },
+    del() {
+      operation = 'delete';
+      return query;
+    },
     returning(column) {
       returningColumn = column;
       return query;
@@ -149,6 +153,14 @@ function makeQuery(table, fixture) {
         matchingRows.forEach((row) => Object.assign(row, updateData));
         if (returningColumn === '*') return matchingRows;
         if (returningColumn) return matchingRows.map((row) => ({ [returningColumn]: row[returningColumn] }));
+        return matchingRows.length;
+      }
+
+      if (operation === 'delete') {
+        matchingRows.forEach((row) => {
+          const index = rows.indexOf(row);
+          if (index >= 0) rows.splice(index, 1);
+        });
         return matchingRows.length;
       }
 
@@ -779,4 +791,106 @@ test('cancelBookingAsAdmin rejects wrong pooja, already-cancelled, and past pooj
     () => poojaService.cancelBookingAsAdmin('pooja-1', 'booking-1', 'admin-1'),
     /Cannot cancel a token after the pooja has expired/
   );
+});
+
+test('updatePooja edits an active schedule and preserves its confirmed bookings', async () => {
+  const originalScheduledAt = hoursFromNow(-2);
+  const updatedScheduledAt = hoursFromNow(4);
+  const fixture = {
+    poojas: [
+      {
+        id: 'pooja-1',
+        scheduled_at: originalScheduledAt,
+        place: 'Old Place',
+        total_tokens: 10,
+        status: 'scheduled',
+      },
+    ],
+    pooja_bookings: [
+      { id: 'booking-1', pooja_id: 'pooja-1', status: 'confirmed', token_number: 4 },
+    ],
+  };
+  const poojaService = loadPoojaServiceWithFixture(fixture);
+
+  const updated = await poojaService.updatePooja('pooja-1', {
+    scheduledAt: updatedScheduledAt,
+    place: 'New Place',
+    totalTokens: 20,
+  });
+
+  assert.equal(updated.scheduledAt, updatedScheduledAt);
+  assert.equal(updated.place, 'New Place');
+  assert.equal(updated.totalTokens, 20);
+  assert.equal(updated.bookings[0].status, 'confirmed');
+});
+
+test('updatePooja does not allow capacity below the highest confirmed token number', async () => {
+  const fixture = {
+    poojas: [
+      {
+        id: 'pooja-1',
+        scheduled_at: hoursFromNow(2),
+        place: 'Temple',
+        total_tokens: 10,
+        status: 'scheduled',
+      },
+    ],
+    pooja_bookings: [
+      { id: 'booking-1', pooja_id: 'pooja-1', status: 'confirmed', token_number: 7 },
+    ],
+  };
+  const poojaService = loadPoojaServiceWithFixture(fixture);
+
+  await assert.rejects(
+    () => poojaService.updatePooja('pooja-1', { totalTokens: 6 }),
+    /cannot be less than confirmed token #7/i
+  );
+  assert.equal(fixture.poojas[0].total_tokens, 10);
+});
+
+test('deletePooja permanently deletes a schedule without booking history', async () => {
+  const fixture = {
+    poojas: [
+      {
+        id: 'pooja-1',
+        scheduled_at: hoursFromNow(2),
+        total_tokens: 10,
+        status: 'scheduled',
+      },
+    ],
+    pooja_bookings: [],
+  };
+  const poojaService = loadPoojaServiceWithFixture(fixture);
+
+  const result = await poojaService.deletePooja('pooja-1', 'admin-1');
+
+  assert.equal(result.deletionType, 'hard_delete');
+  assert.equal(fixture.poojas.length, 0);
+});
+
+test('deletePooja cancels a schedule and confirmed tokens while preserving history', async () => {
+  const fixture = {
+    poojas: [
+      {
+        id: 'pooja-1',
+        scheduled_at: hoursFromNow(-2),
+        total_tokens: 10,
+        status: 'scheduled',
+      },
+    ],
+    pooja_bookings: [
+      { id: 'booking-1', pooja_id: 'pooja-1', status: 'confirmed', token_number: 1 },
+      { id: 'booking-2', pooja_id: 'pooja-1', status: 'cancelled', token_number: 2 },
+    ],
+  };
+  const poojaService = loadPoojaServiceWithFixture(fixture);
+
+  const result = await poojaService.deletePooja('pooja-1', 'admin-1');
+
+  assert.equal(result.deletionType, 'cancelled');
+  assert.equal(result.cancelledBookings, 1);
+  assert.equal(fixture.poojas[0].status, 'cancelled');
+  assert.equal(fixture.pooja_bookings.length, 2);
+  assert.equal(fixture.pooja_bookings[0].status, 'cancelled');
+  assert.equal(fixture.pooja_bookings[0].cancelled_by, 'admin-1');
 });

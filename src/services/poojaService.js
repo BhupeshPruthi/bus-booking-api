@@ -28,6 +28,101 @@ class PoojaService {
     return this.getPoojaById(pooja.id);
   }
 
+  async updatePooja(poojaId, data) {
+    await db.transaction(async (trx) => {
+      const pooja = await trx('poojas')
+        .where('id', poojaId)
+        .forUpdate()
+        .first();
+
+      if (!pooja) throw new NotFoundError('Pooja');
+      this.assertPoojaCanBeManaged(pooja);
+
+      const updates = { updated_at: new Date() };
+
+      if (data.scheduledAt !== undefined) {
+        const nextScheduledTime = new Date(data.scheduledAt).getTime();
+        const currentScheduledTime = new Date(pooja.scheduled_at).getTime();
+        if (nextScheduledTime !== currentScheduledTime && nextScheduledTime <= Date.now()) {
+          throw new ValidationError('Pooja date and time must be in the future');
+        }
+        updates.scheduled_at = data.scheduledAt;
+      }
+
+      if (data.place !== undefined) updates.place = data.place;
+
+      if (data.totalTokens !== undefined) {
+        const maxTokenRow = await trx('pooja_bookings')
+          .where('pooja_id', poojaId)
+          .where('status', 'confirmed')
+          .max('token_number as max_token')
+          .first();
+        const highestConfirmedToken = parseInt(maxTokenRow?.max_token || 0, 10);
+        if (data.totalTokens < highestConfirmedToken) {
+          throw new ValidationError(
+            `Total tokens cannot be less than confirmed token #${highestConfirmedToken}`
+          );
+        }
+        updates.total_tokens = data.totalTokens;
+      }
+
+      await trx('poojas').where('id', poojaId).update(updates);
+    });
+
+    return this.getAdminPoojaById(poojaId);
+  }
+
+  async deletePooja(poojaId, adminUserId) {
+    return db.transaction(async (trx) => {
+      const pooja = await trx('poojas')
+        .where('id', poojaId)
+        .forUpdate()
+        .first();
+
+      if (!pooja) throw new NotFoundError('Pooja');
+      this.assertPoojaCanBeManaged(pooja);
+
+      const bookingCountRow = await trx('pooja_bookings')
+        .where('pooja_id', poojaId)
+        .count('id as count')
+        .first();
+      const bookingCount = parseInt(bookingCountRow?.count || 0, 10);
+
+      if (bookingCount === 0) {
+        await trx('poojas').where('id', poojaId).del();
+        return {
+          id: poojaId,
+          status: 'deleted',
+          deletionType: 'hard_delete',
+          cancelledBookings: 0,
+        };
+      }
+
+      const cancelledAt = new Date();
+      const cancelledBookings = await trx('pooja_bookings')
+        .where('pooja_id', poojaId)
+        .where('status', 'confirmed')
+        .update({
+          status: 'cancelled',
+          cancelled_at: cancelledAt,
+          cancelled_by: adminUserId,
+          updated_at: cancelledAt,
+        });
+
+      await trx('poojas').where('id', poojaId).update({
+        status: 'cancelled',
+        updated_at: cancelledAt,
+      });
+
+      return {
+        id: poojaId,
+        status: 'cancelled',
+        deletionType: 'cancelled',
+        cancelledBookings,
+      };
+    });
+  }
+
   async getAdminUpcomingPoojas() {
     return this.getUpcomingPoojas();
   }
@@ -275,6 +370,15 @@ class PoojaService {
     const scheduledTime = new Date(scheduledAt).getTime();
     if (Number.isNaN(scheduledTime)) return true;
     return scheduledTime + POOJA_ACTIVE_WINDOW_MS <= now.getTime();
+  }
+
+  assertPoojaCanBeManaged(pooja) {
+    if (pooja.status !== 'scheduled') {
+      throw new ValidationError('Only scheduled poojas can be edited or deleted');
+    }
+    if (this.isPoojaExpired(pooja.scheduled_at)) {
+      throw new ValidationError('Cannot edit or delete a pooja after it has expired');
+    }
   }
 
   async getBookedTokensCount(poojaId) {

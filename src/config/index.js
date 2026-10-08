@@ -19,6 +19,10 @@ const googleClientIds = (process.env.GOOGLE_CLIENT_IDS || process.env.GOOGLE_CLI
   .split(',')
   .map((id) => id.trim())
   .filter(Boolean);
+const appleClientIds = (process.env.APPLE_CLIENT_IDS || process.env.APPLE_CLIENT_ID || '')
+  .split(',')
+  .map((id) => id.trim())
+  .filter(Boolean);
 
 function readEnv(key) {
   return process.env[key]?.trim() || '';
@@ -70,6 +74,11 @@ const config = {
     clientId: googleClientIds[0] || '',
     /** Optional comma-separated list for migration between Web client IDs */
     clientIds: googleClientIds,
+  },
+
+  apple: {
+    /** iOS bundle identifier(s) accepted as the Apple identity-token audience. */
+    clientIds: appleClientIds,
   },
 
   upload: {

@@ -115,13 +115,24 @@ test('daily occupancy executes against PostgreSQL with checkout-exclusive status
       { id: '00000000-0000-0000-0000-000000000102', status: 'cancellation_requested', check_in_date: dayTwo, check_out_date: dayFour, night_count: 2, total_amount: 3000, confirmed_at: now },
       { id: '00000000-0000-0000-0000-000000000103', status: 'cancelled', check_in_date: dayTwo, check_out_date: dayFour, night_count: 2, total_amount: 10500, confirmed_at: now },
       { id: '00000000-0000-0000-0000-000000000104', status: 'confirmed', check_in_date: fromDate, check_out_date: dayTwo, night_count: 1, total_amount: 3500, confirmed_at: now },
+      { id: '00000000-0000-0000-0000-000000000105', status: 'pending', check_in_date: dayTwo, check_out_date: dayFour, night_count: 2, total_amount: 3500, confirmed_at: null },
     ]);
     await db('stay_booking_items').insert([
       { id: '00000000-0000-0000-0000-000000000201', booking_id: '00000000-0000-0000-0000-000000000101', unit_type_id: TYPE_IDS.threeBed, quantity: 2 },
       { id: '00000000-0000-0000-0000-000000000202', booking_id: '00000000-0000-0000-0000-000000000102', unit_type_id: TYPE_IDS.fourBed, quantity: 1 },
       { id: '00000000-0000-0000-0000-000000000203', booking_id: '00000000-0000-0000-0000-000000000103', unit_type_id: TYPE_IDS.hall, quantity: 3 },
       { id: '00000000-0000-0000-0000-000000000204', booking_id: '00000000-0000-0000-0000-000000000104', unit_type_id: TYPE_IDS.hall, quantity: 1 },
+      { id: '00000000-0000-0000-0000-000000000205', booking_id: '00000000-0000-0000-0000-000000000105', unit_type_id: TYPE_IDS.hall, quantity: 1 },
     ]);
+    await db('stay_cancellation_requests').insert({
+      booking_id: '00000000-0000-0000-0000-000000000102',
+      status: 'pending',
+      previous_booking_status: 'confirmed',
+      reason: 'Plans may change',
+      requested_at: now,
+      standard_full_refund_eligible: true,
+      hours_before_check_in: 72,
+    });
 
     const report = await new StayService().getDailyOccupancy({ fromDate, days: 3 });
     const dayOne = report.days[0];
@@ -143,6 +154,89 @@ test('daily occupancy executes against PostgreSQL with checkout-exclusive status
     assert.equal(dayThreeReport.bookingCount, 1);
     assert.equal(dayThreeReport.totalEarnings, 0);
     assert.equal(dayThreeReport.unitTypes.find((unit) => unit.code === 'four_bed_room').bookedUnits, 1);
+
+    const details = await new StayService().getDailyOccupancyBookings(dayTwo);
+    assert.equal(details.date, dayTwo);
+    assert.equal(details.bookingCount, 2);
+    assert.deepEqual(
+      details.bookings.map((booking) => booking.id),
+      [
+        '00000000-0000-0000-0000-000000000102',
+        '00000000-0000-0000-0000-000000000101',
+      ]
+    );
+    assert.equal(details.bookings[0].status, 'cancellation_requested');
+    assert.equal(details.bookings[0].dailyEarningsContribution, null);
+    assert.equal(details.bookings[0].cancellation.reason, 'Plans may change');
+    assert.equal(details.bookings[1].dailyEarningsContribution, 1200);
+    assert.equal(details.bookings[1].totalAccommodationUnits, 2);
+    assert.ok(details.bookings.every((booking) => booking.id !== '00000000-0000-0000-0000-000000000103'));
+    assert.ok(details.bookings.every((booking) => booking.id !== '00000000-0000-0000-0000-000000000104'));
+    assert.ok(details.bookings.every((booking) => booking.id !== '00000000-0000-0000-0000-000000000105'));
+  } finally {
+    await db.schema.dropTableIfExists('stay_cancellation_requests');
+    await db.schema.dropTableIfExists('stay_booking_items');
+    await db.schema.dropTableIfExists('stay_bookings');
+    await db.schema.dropTableIfExists('stay_unit_types');
+  }
+});
+
+test('historical occupancy includes completed stays and exposes their booking details', {
+  skip: !hasTestDatabase && 'TEST_DATABASE_URL is required for PostgreSQL integration tests',
+}, async () => {
+  const today = indiaDateOnly();
+  const fromDate = addCalendarDays(today, -2);
+  const secondNight = addCalendarDays(fromDate, 1);
+  const now = new Date();
+
+  await resetStayOccupancyTables();
+  try {
+    await db('stay_unit_types').insert({
+      id: TYPE_IDS.threeBed,
+      code: 'three_bed_room',
+      display_name: '3 Bed Room',
+      capacity: 3,
+      total_inventory: 13,
+      nightly_rate: 1200,
+      display_order: 1,
+      is_active: true,
+    });
+    await db('stay_bookings').insert({
+      id: '00000000-0000-0000-0000-000000000106',
+      reference: 'STAY-HISTORICAL',
+      status: 'completed',
+      check_in_date: fromDate,
+      check_out_date: today,
+      night_count: 2,
+      guest_count: 2,
+      contact_name: 'Historical Guest',
+      contact_email: 'historical@example.com',
+      contact_phone: '9999999999',
+      total_amount: 2400,
+      confirmed_at: now,
+      completed_at: now,
+    });
+    await db('stay_booking_items').insert({
+      id: '00000000-0000-0000-0000-000000000206',
+      booking_id: '00000000-0000-0000-0000-000000000106',
+      unit_type_id: TYPE_IDS.threeBed,
+      unit_type_code: 'three_bed_room',
+      unit_type_name: '3 Bed Room',
+      quantity: 1,
+      nightly_rate: 1200,
+      night_count: 2,
+      line_total: 2400,
+    });
+
+    const report = await new StayService().getDailyOccupancy({ fromDate, days: 2 });
+    assert.deepEqual(report.days.map((day) => day.date), [fromDate, secondNight]);
+    assert.ok(report.days.every((day) => day.bookingCount === 1));
+    assert.ok(report.days.every((day) => day.totalEarnings === 1200));
+
+    const details = await new StayService().getDailyOccupancyBookings(fromDate);
+    assert.equal(details.bookings.length, 1);
+    assert.equal(details.bookings[0].status, 'completed');
+    assert.equal(details.bookings[0].dailyEarningsContribution, 1200);
   } finally {
     await db.schema.dropTableIfExists('stay_cancellation_requests');
     await db.schema.dropTableIfExists('stay_booking_items');

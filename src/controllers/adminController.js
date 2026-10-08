@@ -51,6 +51,16 @@ const createPooja = asyncHandler(async (req, res) => {
   res.status(201).json({ success: true, data: result });
 });
 
+const updatePooja = asyncHandler(async (req, res) => {
+  const result = await poojaService.updatePooja(req.params.id, req.body);
+  res.json({ success: true, data: result });
+});
+
+const deletePooja = asyncHandler(async (req, res) => {
+  const result = await poojaService.deletePooja(req.params.id, req.user.id);
+  res.json({ success: true, data: result });
+});
+
 const getAdminPoojas = asyncHandler(async (req, res) => {
   const result = await poojaService.getAdminUpcomingPoojas();
   res.json({ success: true, data: result });
@@ -85,6 +95,8 @@ module.exports = {
   cancelBooking,
   createTrip,
   createPooja,
+  updatePooja,
+  deletePooja,
   getAdminPoojas,
   getAdminPoojaById,
   cancelPoojaBooking,

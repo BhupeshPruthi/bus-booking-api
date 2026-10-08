@@ -8,6 +8,12 @@ const getBookings = asyncHandler(async (req, res) => {
 const getDailyOccupancy = asyncHandler(async (req, res) => {
   res.json({ success: true, data: await stayService.getDailyOccupancy(req.query) });
 });
+const getDailyOccupancyBookings = asyncHandler(async (req, res) => {
+  res.json({
+    success: true,
+    data: await stayService.getDailyOccupancyBookings(req.params.date),
+  });
+});
 const getBooking = asyncHandler(async (req, res) => {
   res.json({ success: true, data: await stayService.getBookingById(req.params.id) });
 });
@@ -52,6 +58,7 @@ const deactivateCoupon = asyncHandler(async (req, res) => {
 module.exports = {
   getBookings,
   getDailyOccupancy,
+  getDailyOccupancyBookings,
   getBooking,
   createAdminBooking,
   confirmBooking,

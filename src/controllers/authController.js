@@ -15,6 +15,11 @@ const signInWithGoogle = asyncHandler(async (req, res) => {
   });
 });
 
+const signInWithApple = asyncHandler(async (req, res) => {
+  const result = await authService.signInWithApple(req.body.identityToken);
+  res.json({ success: true, data: result });
+});
+
 /**
  * Refresh access token
  * POST /api/auth/refresh-token
@@ -43,6 +48,11 @@ const logout = asyncHandler(async (req, res) => {
   });
 });
 
+const deleteAccount = asyncHandler(async (req, res) => {
+  await authService.deleteAccount(req.user.id);
+  res.json({ success: true, data: { message: 'Account deleted' } });
+});
+
 /**
  * Return the server/database-resolved identity and permissions for the current token.
  * GET /api/auth/session
@@ -58,7 +68,9 @@ const session = asyncHandler(async (req, res) => {
 
 module.exports = {
   signInWithGoogle,
+  signInWithApple,
   refreshToken,
   logout,
+  deleteAccount,
   session,
 };

@@ -2,7 +2,7 @@ const express = require('express');
 const authController = require('../controllers/authController');
 const { authenticate } = require('../middlewares/authenticate');
 const validate = require('../middlewares/validate');
-const { googleSignInSchema, refreshTokenSchema } = require('../validators/schemas');
+const { googleSignInSchema, appleSignInSchema, refreshTokenSchema } = require('../validators/schemas');
 
 const router = express.Router();
 
@@ -12,6 +12,13 @@ const router = express.Router();
  * @access Public
  */
 router.post('/google', validate(googleSignInSchema), authController.signInWithGoogle);
+
+/**
+ * @route POST /api/auth/apple
+ * @desc Sign in with an Apple identity token (iOS)
+ * @access Public
+ */
+router.post('/apple', validate(appleSignInSchema), authController.signInWithApple);
 
 /**
  * @route POST /api/auth/refresh-token
@@ -26,6 +33,9 @@ router.post('/refresh-token', validate(refreshTokenSchema), authController.refre
  * @access Public
  */
 router.post('/logout', validate(refreshTokenSchema), authController.logout);
+
+/** Account deletion is required for App Store account-based apps. */
+router.delete('/account', authenticate, authController.deleteAccount);
 
 /**
  * @route GET /api/auth/session

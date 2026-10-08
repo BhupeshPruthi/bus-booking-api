@@ -18,6 +18,12 @@ const googleSignInSchema = Joi.object({
   }),
 });
 
+const appleSignInSchema = Joi.object({
+  identityToken: Joi.string().required().min(100).messages({
+    'string.min': 'Invalid Apple credentials',
+  }),
+});
+
 const refreshTokenSchema = Joi.object({
   refreshToken: Joi.string().required(),
 });
@@ -183,6 +189,12 @@ const createPoojaSchema = Joi.object({
   totalTokens: Joi.number().integer().min(1).max(10000).default(50),
 });
 
+const updatePoojaSchema = Joi.object({
+  scheduledAt: Joi.date().iso(),
+  place: Joi.string().max(200).trim(),
+  totalTokens: Joi.number().integer().min(1).max(10000),
+}).min(1);
+
 const bookPoojaTokenSchema = Joi.object({
   name: Joi.string().max(200).trim().required(),
   phone: Joi.string()
@@ -245,7 +257,11 @@ const stayBookingIdParamsSchema = Joi.object({
 
 const stayDailyOccupancySchema = Joi.object({
   fromDate: stayDateSchema.optional(),
-  days: Joi.number().integer().min(1).max(90).default(30),
+  days: Joi.number().integer().min(1).max(90),
+});
+
+const stayOccupancyDateParamsSchema = Joi.object({
+  date: stayDateSchema.required(),
 });
 
 const stayCancellationSchema = Joi.object({
@@ -342,6 +358,7 @@ module.exports = {
 
   // Auth
   googleSignInSchema,
+  appleSignInSchema,
   refreshTokenSchema,
 
   // Feedback
@@ -375,6 +392,7 @@ module.exports = {
 
   // Pooja
   createPoojaSchema,
+  updatePoojaSchema,
   bookPoojaTokenSchema,
   adminCancelPoojaBookingSchema,
 
@@ -384,6 +402,7 @@ module.exports = {
   stayBookingListSchema,
   stayBookingIdParamsSchema,
   stayDailyOccupancySchema,
+  stayOccupancyDateParamsSchema,
   unifiedBookingListSchema,
   unifiedBookingDetailSchema,
   stayCancellationSchema,

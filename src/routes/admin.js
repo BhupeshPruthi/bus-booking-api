@@ -17,11 +17,13 @@ const {
   adminCancelBookingSchema,
   createTripSchema,
   createPoojaSchema,
+  updatePoojaSchema,
   createEventSchema,
   adminCancelPoojaBookingSchema,
   stayBookingListSchema,
   stayBookingIdParamsSchema,
   stayDailyOccupancySchema,
+  stayOccupancyDateParamsSchema,
   stayCancellationListSchema,
   stayRejectionSchema,
   stayCancellationDecisionSchema,
@@ -62,6 +64,25 @@ router.post('/trips', busAdminOrSuperUser, validate(createTripSchema), adminCont
  * @access Admin
  */
 router.post('/poojas', poojaAdminOrSuperUser, validate(createPoojaSchema), adminController.createPooja);
+
+/**
+ * @route PUT /api/admin/poojas/:id
+ * @desc Update an active pooja schedule
+ * @access Admin
+ */
+router.put(
+  '/poojas/:id',
+  poojaAdminOrSuperUser,
+  validate(updatePoojaSchema),
+  adminController.updatePooja
+);
+
+/**
+ * @route DELETE /api/admin/poojas/:id
+ * @desc Delete an unbooked pooja or cancel it and its bookings while preserving history
+ * @access Admin
+ */
+router.delete('/poojas/:id', poojaAdminOrSuperUser, adminController.deletePooja);
 
 /**
  * @route GET /api/admin/poojas
@@ -161,6 +182,13 @@ router.get(
   stayAdminOrSuperUser,
   validate(stayDailyOccupancySchema, 'query'),
   stayAdminController.getDailyOccupancy
+);
+
+router.get(
+  '/stay/daily-occupancy/:date/bookings',
+  stayAdminOrSuperUser,
+  validate(stayOccupancyDateParamsSchema, 'params'),
+  stayAdminController.getDailyOccupancyBookings
 );
 
 router.get(

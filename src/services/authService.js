@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const { OAuth2Client } = require('google-auth-library');
+const crypto = require('crypto');
 const { db } = require('../config/database');
 const config = require('../config');
 const { UnauthorizedError, ValidationError } = require('../utils/errors');
@@ -28,6 +29,58 @@ function decodeJwtPayload(idToken) {
 }
 
 class AuthService {
+  async verifyAppleIdentityToken(identityToken) {
+    const audiences = config.apple.clientIds || [];
+    if (audiences.length === 0) throw new ValidationError('Apple Sign-In is not configured (APPLE_CLIENT_ID)');
+    const [encodedHeader, encodedPayload, encodedSignature] = String(identityToken).split('.');
+    if (!encodedHeader || !encodedPayload || !encodedSignature) throw new UnauthorizedError('Invalid Apple sign-in token');
+    let header;
+    let payload;
+    try {
+      header = JSON.parse(Buffer.from(encodedHeader, 'base64url').toString('utf8'));
+      payload = JSON.parse(Buffer.from(encodedPayload, 'base64url').toString('utf8'));
+    } catch {
+      throw new UnauthorizedError('Invalid Apple sign-in token');
+    }
+    if (header.alg !== 'RS256' || !header.kid) throw new UnauthorizedError('Invalid Apple sign-in token');
+    let response;
+    try {
+      response = await fetch('https://appleid.apple.com/auth/keys', { signal: AbortSignal.timeout(5000) });
+    } catch {
+      throw new UnauthorizedError('Unable to verify Apple sign-in token');
+    }
+    if (!response.ok) throw new UnauthorizedError('Unable to verify Apple sign-in token');
+    const { keys = [] } = await response.json();
+    const jwk = keys.find((key) => key.kid === header.kid);
+    if (!jwk) throw new UnauthorizedError('Invalid Apple sign-in token');
+    const valid = crypto.verify('RSA-SHA256', Buffer.from(`${encodedHeader}.${encodedPayload}`), crypto.createPublicKey({ key: jwk, format: 'jwk' }), Buffer.from(encodedSignature, 'base64url'));
+    if (!valid || payload.iss !== 'https://appleid.apple.com' || !audiences.includes(payload.aud) || !payload.sub || !payload.exp || payload.exp * 1000 <= Date.now()) throw new UnauthorizedError('Invalid Apple sign-in token');
+    return { sub: String(payload.sub), email: payload.email ? String(payload.email).toLowerCase().trim() : null };
+  }
+
+  async signInWithApple(identityToken) {
+    const { sub, email } = await this.verifyAppleIdentityToken(identityToken);
+    let user = await db('users').where('apple_sub', sub).whereNull('deleted_at').first();
+    if (!user && email) user = await db('users').where('email', email).whereNull('deleted_at').first();
+    if (!user) {
+      const [created] = await db('users').insert({ apple_sub: sub, email, name: email ? email.split('@')[0] : 'Balaji Sevak User', mobile: null, role: 'consumer' }).returning('*');
+      user = created;
+    } else if (user.apple_sub !== sub) {
+      await db('users').where('id', user.id).update({ apple_sub: sub, updated_at: db.fn.now() });
+      user = await db('users').where('id', user.id).first();
+    }
+    const accessToken = this.generateAccessToken(user);
+    const refreshToken = await this.generateRefreshToken(user.id);
+    return { accessToken, refreshToken, user: { id: user.id, mobile: user.mobile, email: user.email, name: user.name, role: user.role, isSuperUser: this.isSuperUser(user), adminType: normalizeAdminType({ ...user, isSuperUser: this.isSuperUser(user) }), capabilities: capabilitiesFor({ ...user, isSuperUser: this.isSuperUser(user) }), isNewUser: false } };
+  }
+
+  async deleteAccount(userId) {
+    const deletedEmail = `deleted+${userId}@invalid.balajisevak`;
+    await db.transaction(async (trx) => {
+      await trx('refresh_tokens').where('user_id', userId).del();
+      await trx('users').where('id', userId).update({ name: 'Deleted User', email: deletedEmail, mobile: null, google_sub: null, apple_sub: null, deleted_at: trx.fn.now(), updated_at: trx.fn.now() });
+    });
+  }
   /**
    * Verify Google ID token and return Google profile fields
    */
