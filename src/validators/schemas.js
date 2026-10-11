@@ -385,11 +385,21 @@ const chalisaMarathonParamsSchema = Joi.object({
   id: Joi.string().uuid().required(),
 });
 
+// Date.parse rolls impossible dates over (30 Feb becomes 2 Mar), so check the written parts.
+function isRealCalendarTime(value) {
+  const [, y, mo, d, h, mi, s = '0'] = value.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/) || [];
+  if (!y) return false;
+  const parts = [y, mo, d, h, mi, s].map(Number);
+  const utc = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2], parts[3], parts[4], parts[5]));
+  return utc.getUTCFullYear() === parts[0] && utc.getUTCMonth() === parts[1] - 1 && utc.getUTCDate() === parts[2] &&
+    utc.getUTCHours() === parts[3] && utc.getUTCMinutes() === parts[4] && utc.getUTCSeconds() === parts[5];
+}
+
 // Start times must say their time zone ("Z" or "+05:30"), so they're never read as UTC by mistake.
 // (Joi's isoDate() would first convert a zone-less time using the server's own zone.)
 const chalisaStartsAt = Joi.string()
   .pattern(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})$/)
-  .custom((value, helpers) => (Number.isNaN(Date.parse(value)) ? helpers.error('string.pattern.base') : value))
+  .custom((value, helpers) => (isRealCalendarTime(value) ? value : helpers.error('string.pattern.base')))
   .messages({
     'string.pattern.base': 'startsAt must be a date and time with a time zone, for example 2026-10-12T06:00:00+05:30',
   });

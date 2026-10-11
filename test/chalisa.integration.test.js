@@ -237,6 +237,22 @@ test('Hanuman Chalisa marathon lifecycle and counting rules', { skip: !hasTestDa
     await chalisa.endMarathon(admin.id, again.id, { confirmText: 'END' });
   });
 
+  await t.test('a tap or rename racing with account deletion never leaves the person on the board', async () => {
+    const authService = require('../src/services/authService');
+    const { marathon: open } = await chalisa.scheduleMarathon(admin.id, { title: 'Deletion race' });
+    for (let i = 0; i < 15; i += 1) {
+      const user = await createUser(`Victim ${i}`);
+      const ops = await Promise.allSettled([
+        chalisa.recordReading({ userId: user.id }, randomUUID()),
+        authService.deleteAccount(user.id),
+        chalisa.saveParticipant({ userId: user.id }, `Victim ${i} renamed`),
+      ]);
+      assert.equal(ops[1].status, 'fulfilled');
+      assert.equal(await db('chalisa_participants').where('user_id', user.id).first(), undefined, `round ${i}`);
+    }
+    await chalisa.endMarathon(admin.id, open.id, { confirmText: 'END' });
+  });
+
   await t.test('a tap racing with End is either counted in the final total or refused', async () => {
     const { marathon: race } = await chalisa.scheduleMarathon(admin.id, { title: 'Race marathon' });
     const runner = await chalisa.saveParticipant({}, 'Runner');

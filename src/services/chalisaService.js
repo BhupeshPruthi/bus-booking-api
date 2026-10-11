@@ -174,8 +174,17 @@ async function resolveParticipant(identity, database, { create = false, forUpdat
   return null;
 }
 
+/**
+ * The signed-in user, if their account isn't deleted. FOR SHARE makes account deletion (which
+ * updates this row first) and Chalisa writes for the same person wait for each other, so a
+ * write can't slip in while the account is being deleted. Call it inside a transaction.
+ */
 async function activeUser(database, userId) {
-  const user = await database('users').where('id', userId).whereNull('deleted_at').first('id', 'name');
+  const user = await database('users')
+    .where('id', userId)
+    .whereNull('deleted_at')
+    .forShare()
+    .first('id', 'name');
   if (!user) throw new UnauthorizedError('Please sign in again.', 'SESSION_USER_NOT_FOUND');
   return user;
 }
@@ -270,13 +279,15 @@ async function saveParticipant(identity, rawName, database = db) {
   }
 
   if (identity?.userId) {
-    await activeUser(database, identity.userId);
-    await database('chalisa_participants')
-      .insert({ user_id: identity.userId, display_name: displayName })
-      .onConflict('user_id')
-      .merge({ display_name: displayName, updated_at: database.fn.now() });
-    const participant = await database('chalisa_participants').where('user_id', identity.userId).first();
-    return { participant: formatParticipant(participant), guestToken: null };
+    return database.transaction(async (trx) => {
+      await activeUser(trx, identity.userId);
+      await trx('chalisa_participants')
+        .insert({ user_id: identity.userId, display_name: displayName })
+        .onConflict('user_id')
+        .merge({ display_name: displayName, updated_at: trx.fn.now() });
+      const participant = await trx('chalisa_participants').where('user_id', identity.userId).first();
+      return { participant: formatParticipant(participant), guestToken: null };
+    });
   }
 
   if (identity?.guestParticipantId) {

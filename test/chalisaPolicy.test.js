@@ -93,6 +93,11 @@ test('schedule start times must include a time zone', () => {
   assert.ok(chalisaScheduleMarathonSchema.validate({ title: 'Diwali', startsAt: '2026-10-12T06:00' }).error);
   assert.equal(chalisaScheduleMarathonSchema.validate({ title: 'Diwali', startsAt: '2026-10-12T06:00:00+05:30' }).error, undefined);
   assert.equal(chalisaScheduleMarathonSchema.validate({ title: 'Diwali', startsAt: '2026-10-12T00:30:00.000Z' }).error, undefined);
+  // Impossible dates and times aren't rolled over into real ones.
+  for (const startsAt of ['2026-02-30T06:00:00Z', '2026-10-12T24:00:00Z', '2026-13-01T06:00:00Z', '2026-10-12T06:60:00Z']) {
+    assert.ok(chalisaScheduleMarathonSchema.validate({ title: 'Diwali', startsAt }).error, startsAt);
+  }
+  assert.equal(chalisaScheduleMarathonSchema.validate({ title: 'Leap', startsAt: '2028-02-29T06:00:00+05:30' }).error, undefined);
 });
 
 test('a guest pass can never be used as a sign-in token', () => {
