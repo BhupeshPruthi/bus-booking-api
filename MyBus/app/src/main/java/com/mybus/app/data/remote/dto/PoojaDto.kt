@@ -11,6 +11,21 @@ data class CreatePoojaRequest(
 )
 
 @JsonClass(generateAdapter = true)
+data class UpdatePoojaRequest(
+    @Json(name = "scheduledAt") val scheduledAt: String,
+    @Json(name = "place") val place: String,
+    @Json(name = "totalTokens") val totalTokens: Int
+)
+
+@JsonClass(generateAdapter = true)
+data class DeletePoojaResult(
+    @Json(name = "id") val id: String,
+    @Json(name = "status") val status: String,
+    @Json(name = "deletionType") val deletionType: String,
+    @Json(name = "cancelledBookings") val cancelledBookings: Int = 0
+)
+
+@JsonClass(generateAdapter = true)
 data class BookPoojaRequest(
     @Json(name = "name") val name: String,
     @Json(name = "phone") val phone: String,

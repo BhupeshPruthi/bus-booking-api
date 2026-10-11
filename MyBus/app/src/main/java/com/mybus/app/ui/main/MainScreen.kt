@@ -15,6 +15,11 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.mybus.app.ui.chalisa.CHALISA_TAB_GROUP
+import com.mybus.app.ui.chalisa.CHALISA_TAB_MY_PATH
+import com.mybus.app.ui.chalisa.ChalisaArchiveScreen
+import com.mybus.app.ui.chalisa.ChalisaScheduleScreen
+import com.mybus.app.ui.chalisa.ChalisaScreen
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.mybus.app.data.local.TokenManager
 import com.mybus.app.ui.addbus.AddBusScreen
@@ -69,6 +74,7 @@ fun MainScreen(
     val isAdmin by tokenManager.effectiveIsAdmin.collectAsStateWithLifecycle(initialValue = false)
     val canManageStay by tokenManager.canManageStay.collectAsStateWithLifecycle(initialValue = false)
     val canManageEvents by tokenManager.canManageEvents.collectAsStateWithLifecycle(initialValue = false)
+    val canManageChalisa by tokenManager.canManageChalisa.collectAsStateWithLifecycle(initialValue = false)
     val isAnyAdmin by tokenManager.isAnyAdmin.collectAsStateWithLifecycle(initialValue = false)
 
     val detailRoutes = remember {
@@ -78,6 +84,7 @@ fun MainScreen(
             "add_event",
             "select_stops",
             "schedule_pooja",
+            "edit_pooja/{poojaId}",
             "my_pooja_tokens",
             "my_stay_bookings",
             "pooja_upcoming_list",
@@ -89,6 +96,9 @@ fun MainScreen(
             "my_booking_detail/{bookingType}/{bookingId}",
             "my_trips",
             "live_events_web",
+            CHALISA_ROUTE,
+            CHALISA_SCHEDULE_ROUTE,
+            CHALISA_ARCHIVE_ROUTE,
             BottomTabs.PROFILE
         )
     }
@@ -176,6 +186,13 @@ fun MainScreen(
                         tabNavController.navigate("live_events_web") {
                             launchSingleTop = true
                         }
+                    },
+                    canManageChalisa = canManageChalisa,
+                    onOpenChalisa = {
+                        tabNavController.navigate("hanuman_chalisa?tab=$CHALISA_TAB_GROUP") { launchSingleTop = true }
+                    },
+                    onScheduleChalisa = {
+                        tabNavController.navigate("chalisa_schedule") { launchSingleTop = true }
                     }
                 )
             }
@@ -229,7 +246,10 @@ fun MainScreen(
             composable(BottomTabs.PROFILE) {
                 ProfileScreen(
                     onLogout = onLogout,
-                    onBack = { tabNavController.popBackStack() }
+                    onBack = { tabNavController.popBackStack() },
+                    onOpenChalisa = {
+                        tabNavController.navigate("hanuman_chalisa?tab=$CHALISA_TAB_MY_PATH") { launchSingleTop = true }
+                    }
                 )
             }
 
@@ -248,6 +268,36 @@ fun MainScreen(
             }
             composable("add_event") {
                 AddEventScreen(onBack = { tabNavController.popBackStack() })
+            }
+            composable(
+                route = CHALISA_ROUTE,
+                arguments = listOf(navArgument("tab") { type = NavType.IntType; defaultValue = CHALISA_TAB_GROUP })
+            ) { backStackEntry ->
+                ChalisaScreen(
+                    initialTab = backStackEntry.arguments?.getInt("tab") ?: CHALISA_TAB_GROUP,
+                    onBack = { tabNavController.popBackStack() },
+                    onOpenArchive = { tabNavController.navigate(CHALISA_ARCHIVE_ROUTE) { launchSingleTop = true } },
+                    onSchedule = { marathonId ->
+                        val route = if (marathonId != null) "chalisa_schedule?marathonId=$marathonId" else "chalisa_schedule"
+                        tabNavController.navigate(route) { launchSingleTop = true }
+                    }
+                )
+            }
+            composable(
+                route = CHALISA_SCHEDULE_ROUTE,
+                arguments = listOf(navArgument("marathonId") { type = NavType.StringType; nullable = true; defaultValue = null })
+            ) {
+                ChalisaScheduleScreen(
+                    onBack = { tabNavController.popBackStack() },
+                    onSaved = {
+                        // Go to the marathon screen, replacing the form.
+                        tabNavController.popBackStack()
+                        tabNavController.navigate("hanuman_chalisa?tab=$CHALISA_TAB_GROUP") { launchSingleTop = true }
+                    }
+                )
+            }
+            composable(CHALISA_ARCHIVE_ROUTE) {
+                ChalisaArchiveScreen(onBack = { tabNavController.popBackStack() })
             }
             composable("live_events_web") {
                 InAppWebViewScreen(
@@ -281,6 +331,14 @@ fun MainScreen(
                 )
             }
             composable("schedule_pooja") {
+                SchedulePoojaScreen(
+                    onBack = { tabNavController.popBackStack() }
+                )
+            }
+            composable(
+                route = "edit_pooja/{poojaId}",
+                arguments = listOf(navArgument("poojaId") { type = NavType.StringType })
+            ) {
                 SchedulePoojaScreen(
                     onBack = { tabNavController.popBackStack() }
                 )
@@ -322,6 +380,10 @@ fun MainScreen(
                 PoojaDetailScreen(
                     isAdmin = isAdmin,
                     onBack = { tabNavController.popBackStack() },
+                    onEdit = { poojaId ->
+                        tabNavController.navigate("edit_pooja/$poojaId")
+                    },
+                    onDeleted = { tabNavController.popBackStack() },
                     onBookTokenClick = { poojaId ->
                         if (isLoggedIn) {
                             tabNavController.navigate("pooja_book/$poojaId")
@@ -417,3 +479,7 @@ fun MainScreen(
         }
     }
 }
+
+private const val CHALISA_ROUTE = "hanuman_chalisa?tab={tab}"
+private const val CHALISA_SCHEDULE_ROUTE = "chalisa_schedule?marathonId={marathonId}"
+private const val CHALISA_ARCHIVE_ROUTE = "chalisa_archive"

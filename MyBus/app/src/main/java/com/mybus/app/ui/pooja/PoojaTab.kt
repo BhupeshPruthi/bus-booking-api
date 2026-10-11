@@ -50,7 +50,7 @@ fun PoojaTab(
         contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
         topBar = {
             TopAppBar(
-                title = { Text("Pooja", fontWeight = FontWeight.Bold) },
+                title = { Text("Puja", fontWeight = FontWeight.Bold) },
                 actions = {
                     if (isAdmin) {
                         IconButton(onClick = onAddClick) {
@@ -120,7 +120,7 @@ fun PoojaTab(
                         )
                         Spacer(Modifier.height(16.dp))
                         Text(
-                            text = "No upcoming pooja found",
+                            text = "No upcoming Puja found",
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center

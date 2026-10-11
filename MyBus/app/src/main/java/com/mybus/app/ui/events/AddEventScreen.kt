@@ -39,7 +39,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
@@ -292,7 +291,7 @@ private fun EventDatePicker(
 
     OutlinedButton(
         onClick = {
-            val now = date ?: LocalDate.now()
+            val now = date ?: LocalDate.now(EventBusinessTimeZone)
             DatePickerDialog(
                 context,
                 { _, year, month, day -> onDateSelected(LocalDate.of(year, month + 1, day)) },
@@ -311,7 +310,7 @@ private fun EventDatePicker(
 private fun formatEventDate(isoString: String): String {
     return try {
         val instant = Instant.parse(isoString)
-        val zoned = instant.atZone(ZoneId.systemDefault())
+        val zoned = instant.atZone(EventBusinessTimeZone)
         zoned.format(DateTimeFormatter.ofPattern("dd MMM yyyy"))
     } catch (_: Exception) {
         isoString

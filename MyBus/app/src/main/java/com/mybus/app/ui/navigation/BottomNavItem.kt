@@ -45,7 +45,7 @@ object BottomTabs {
         ),
         BottomNavItem(
             route = POOJA,
-            label = "Pooja",
+            label = "Puja",
             selectedIcon = Icons.Filled.SelfImprovement,
             unselectedIcon = Icons.Outlined.SelfImprovement
         ),

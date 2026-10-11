@@ -8,6 +8,7 @@ import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Multipart
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Part
@@ -33,6 +34,17 @@ interface ApiService {
 
     @POST("admin/poojas")
     suspend fun createPooja(@Body request: CreatePoojaRequest): Response<ApiResponse<PoojaDetailData>>
+
+    @PUT("admin/poojas/{id}")
+    suspend fun updatePooja(
+        @Path("id") poojaId: String,
+        @Body request: UpdatePoojaRequest
+    ): Response<ApiResponse<PoojaDetailData>>
+
+    @DELETE("admin/poojas/{id}")
+    suspend fun deletePooja(
+        @Path("id") poojaId: String
+    ): Response<ApiResponse<DeletePoojaResult>>
 
     @GET("poojas")
     suspend fun getUpcomingPoojas(): Response<ApiResponse<List<PoojaListItem>>>
@@ -174,6 +186,8 @@ interface ApiService {
     suspend fun getAdminStayBookings(
         @Query("status") status: String? = null,
         @Query("search") search: String? = null,
+        @Query("fromDate") fromDate: String? = null,
+        @Query("toDate") toDate: String? = null,
         @Query("page") page: Int? = null,
         @Query("limit") limit: Int? = null
     ): Response<ApiResponse<StayPage<StayBooking>>>
@@ -185,8 +199,14 @@ interface ApiService {
 
     @GET("admin/stay/daily-occupancy")
     suspend fun getStayDailyOccupancy(
-        @Query("days") days: Int = 30
+        @Query("fromDate") fromDate: String? = null,
+        @Query("days") days: Int? = null
     ): Response<ApiResponse<StayDailyOccupancyReport>>
+
+    @GET("admin/stay/daily-occupancy/{date}/bookings")
+    suspend fun getStayDailyOccupancyBookings(
+        @Path("date") date: String
+    ): Response<ApiResponse<StayDailyOccupancyBookings>>
 
     @POST("admin/stay/bookings/{id}/confirm")
     suspend fun confirmStayBooking(@Path("id") id: String): Response<ApiResponse<StayBooking>>
@@ -240,4 +260,57 @@ interface ApiService {
         @Query("limit") limit: Int? = null
     ): Response<ApiResponse<FeedbackPage>>
 
+
+    // ---- Hanuman Chalisa counter ----
+
+    @GET("chalisa/summary")
+    suspend fun getChalisaSummary(): Response<ApiResponse<ChalisaSummary>>
+
+    @GET("chalisa/marathon")
+    suspend fun getChalisaBoard(
+        @Query("limit") limit: Int = 100,
+        @Query("offset") offset: Int = 0
+    ): Response<ApiResponse<ChalisaBoard>>
+
+    @GET("chalisa/me")
+    suspend fun getMyChalisa(@Query("month") month: String? = null): Response<ApiResponse<ChalisaMyStats>>
+
+    @PUT("chalisa/participant")
+    suspend fun saveChalisaParticipant(
+        @Body request: ChalisaParticipantRequest
+    ): Response<ApiResponse<ChalisaParticipantResult>>
+
+    @POST("chalisa/readings")
+    suspend fun addChalisaReading(@Body request: ChalisaReadingRequest): Response<ApiResponse<ChalisaCounts>>
+
+    @DELETE("chalisa/readings/{clientRequestId}")
+    suspend fun undoChalisaReading(
+        @Path("clientRequestId") clientRequestId: String
+    ): Response<ApiResponse<ChalisaCounts>>
+
+    @GET("chalisa/marathons/archive")
+    suspend fun getChalisaArchive(@Query("limit") limit: Int = 20): Response<ApiResponse<List<ChalisaArchivedMarathon>>>
+
+    @POST("admin/chalisa/marathons")
+    suspend fun scheduleChalisaMarathon(
+        @Body request: ChalisaScheduleRequest
+    ): Response<ApiResponse<ChalisaMarathonResult>>
+
+    @PATCH("admin/chalisa/marathons/{id}")
+    suspend fun updateChalisaMarathon(
+        @Path("id") marathonId: String,
+        @Body request: ChalisaUpdateRequest
+    ): Response<ApiResponse<ChalisaMarathonResult>>
+
+    @DELETE("admin/chalisa/marathons/{id}")
+    suspend fun cancelChalisaMarathon(@Path("id") marathonId: String): Response<ApiResponse<ChalisaCancelResult>>
+
+    @POST("admin/chalisa/marathons/{id}/end")
+    suspend fun endChalisaMarathon(
+        @Path("id") marathonId: String,
+        @Body request: ChalisaEndRequest
+    ): Response<ApiResponse<ChalisaEndResult>>
+
+    @POST("admin/chalisa/marathons/{id}/restore")
+    suspend fun restoreChalisaMarathon(@Path("id") marathonId: String): Response<ApiResponse<ChalisaMarathonResult>>
 }

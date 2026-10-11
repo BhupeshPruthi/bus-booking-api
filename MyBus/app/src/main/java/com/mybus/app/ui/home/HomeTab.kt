@@ -1,5 +1,7 @@
 package com.mybus.app.ui.home
 
+import com.mybus.app.ui.chalisa.ChalisaHomeCard
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -42,10 +44,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.mybus.app.data.remote.dto.EventListItem
 import com.mybus.app.R
+import com.mybus.app.ui.events.EventBusinessTimeZone
 import com.mybus.app.ui.events.EventsViewModel
 import com.mybus.app.ui.theme.AppOutlinedButtonLabel
 import java.time.Instant
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 private val CardShadowElevation = 6.dp
@@ -74,6 +76,9 @@ fun HomeTab(
     onOpenProfile: () -> Unit,
     /** Opens live events page in-app (upcoming event card). */
     onOpenLiveEvents: () -> Unit,
+    canManageChalisa: Boolean = false,
+    onOpenChalisa: () -> Unit = {},
+    onScheduleChalisa: () -> Unit = {},
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -87,6 +92,12 @@ fun HomeTab(
             UpcomingEventsSection(onOpenLiveEvents = onOpenLiveEvents)
 
             MyBookingsSection(onOpenMyBookings = onOpenMyBookings)
+
+            ChalisaHomeCard(
+                canManage = canManageChalisa,
+                onOpen = onOpenChalisa,
+                onSchedule = onScheduleChalisa
+            )
 
             GalleryHomeSection()
 
@@ -299,7 +310,7 @@ private fun UpcomingEventCard(
 private fun formatEventDate(isoString: String): String {
     return try {
         val instant = Instant.parse(isoString)
-        val zoned = instant.atZone(ZoneId.systemDefault())
+        val zoned = instant.atZone(EventBusinessTimeZone)
         zoned.format(DateTimeFormatter.ofPattern("dd MMM"))
     } catch (_: Exception) {
         isoString
@@ -313,7 +324,7 @@ private fun MyBookingsSection(
     ActionCard(
         icon = Icons.Filled.Luggage,
         title = "My Bookings",
-        subtitle = "View all Bus, Stay, and Pooja bookings",
+        subtitle = "View all Bus, Stay, and Puja bookings",
         onClick = onOpenMyBookings
     )
 }

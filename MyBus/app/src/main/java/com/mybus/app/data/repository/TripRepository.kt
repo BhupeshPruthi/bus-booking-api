@@ -1,5 +1,6 @@
 package com.mybus.app.data.repository
 
+import com.mybus.app.data.remote.networkErrorMessage
 import com.mybus.app.data.remote.ApiService
 import com.mybus.app.data.remote.dto.CreateTripRequest
 import com.mybus.app.data.remote.dto.TripData
@@ -22,7 +23,7 @@ class TripRepository @Inject constructor(
                 Result.failure(Exception(errorMsg))
             }
         } catch (e: Exception) {
-            Result.failure(Exception("Network error: ${e.message}"))
+            Result.failure(Exception(networkErrorMessage(e)))
         }
     }
 }

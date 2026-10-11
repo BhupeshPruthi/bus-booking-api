@@ -21,7 +21,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.mybus.app.data.remote.dto.StayBooking
 import com.mybus.app.data.remote.dto.StayUnitType
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 private enum class CustomerStayPage { SEARCH, BOOKING_DETAILS, MY_STAYS }
@@ -538,6 +540,13 @@ internal fun StayBookingCard(
                 }
             }
             Text("${booking.checkInDate} → ${booking.checkOutDate} · ${booking.nightCount} night(s)")
+            booking.createdAt?.let {
+                Text(
+                    "Booked: ${formatStayBookingTimestamp(it)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             Text(
                 if (booking.discountAmount > 0) {
                     "${booking.guestCount} guests · Remaining ₹${booking.totalAmount.asRupees()}"
@@ -561,6 +570,12 @@ internal fun StayBookingCard(
         }
     }
 }
+
+internal fun formatStayBookingTimestamp(value: String): String = runCatching {
+    Instant.parse(value)
+        .atZone(ZoneId.of("Asia/Kolkata"))
+        .format(DateTimeFormatter.ofPattern("dd MMM yyyy, hh:mm a"))
+}.getOrDefault(value)
 
 @Composable
 internal fun StayDateButton(

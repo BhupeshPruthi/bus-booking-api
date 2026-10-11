@@ -55,7 +55,7 @@ fun MyPoojaTokensScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("My Pooja Tokens", fontWeight = FontWeight.Bold) },
+                title = { Text("My Puja Tokens", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")

@@ -4,6 +4,8 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Hanuman Chalisa lock-screen counter (Android 13+ asks the reader first). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:name=".MyBusApplication"
@@ -14,7 +16,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.MyBus"
         android:usesCleartextTraffic="true"
-        tools:targetApi="35">
+        tools:targetApi="36">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -35,6 +37,20 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+        <!-- Hanuman Chalisa counter: lock-screen notification buttons and Quick Settings tile. -->
+        <receiver
+            android:name=".ui.chalisa.lockscreen.ChalisaNotificationReceiver"
+            android:exported="false" />
+        <service
+            android:name=".ui.chalisa.lockscreen.ChalisaTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_stat_chalisa"
+            android:label="Chalisa +1"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
     </application>
 
 </manifest>

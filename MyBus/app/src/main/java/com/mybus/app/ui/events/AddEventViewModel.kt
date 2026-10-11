@@ -10,8 +10,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import java.time.LocalDate
-import java.time.LocalTime
-import java.time.ZoneOffset
 import javax.inject.Inject
 
 data class AddEventUiState(
@@ -75,12 +73,8 @@ class AddEventViewModel @Inject constructor(
             return
         }
 
-        // Treat event as an all-day date. Use UTC so device timezone settings cannot change the selected date.
-        val eventInstant = date
-            .atTime(LocalTime.of(23, 59))
-            .atZone(ZoneOffset.UTC)
-            .toInstant()
-            .toString()
+        // Keep the selected date on the organisation's India calendar before it is serialized as UTC.
+        val eventInstant = date.eventEndInstant().toString()
 
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)

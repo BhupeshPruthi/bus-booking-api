@@ -17,7 +17,9 @@ data class PoojaDetailUiState(
     val error: String? = null,
     val isAdmin: Boolean = false,
     val pooja: PoojaDetailData? = null,
-    val cancelInProgressId: String? = null
+    val cancelInProgressId: String? = null,
+    val isDeleting: Boolean = false,
+    val deletionMessage: String? = null
 )
 
 @HiltViewModel
@@ -76,6 +78,31 @@ class PoojaDetailViewModel @Inject constructor(
                     _uiState.value = _uiState.value.copy(
                         cancelInProgressId = null,
                         error = e.message ?: "Failed to cancel token"
+                    )
+                }
+        }
+    }
+
+    fun deletePooja() {
+        if (poojaId.isBlank() || _uiState.value.isDeleting) return
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isDeleting = true, error = null)
+            poojaRepository.deletePooja(poojaId)
+                .onSuccess { result ->
+                    val message = if (result.deletionType == "hard_delete") {
+                        "Puja schedule deleted"
+                    } else {
+                        "Puja schedule and ${result.cancelledBookings} confirmed token(s) cancelled"
+                    }
+                    _uiState.value = _uiState.value.copy(
+                        isDeleting = false,
+                        deletionMessage = message
+                    )
+                }
+                .onFailure { e ->
+                    _uiState.value = _uiState.value.copy(
+                        isDeleting = false,
+                        error = e.message ?: "Failed to delete pooja"
                     )
                 }
         }

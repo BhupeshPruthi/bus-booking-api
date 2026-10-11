@@ -138,26 +138,16 @@ private fun HelpContent(uiState: SupportUiState, onRetry: () -> Unit) {
             )
         }
         if (uiState.helpContacts.isNotEmpty()) {
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                    )
-                ) {
-                    Column {
-                        uiState.helpContacts.forEachIndexed { index, contact ->
-                            HelpContactRow(
-                                contact = contact,
-                                onCall = {
-                                    context.startActivity(
-                                        Intent(Intent.ACTION_DIAL, Uri.parse("tel:${contact.phone}"))
-                                    )
-                                }
+            uiState.helpContacts.groupBy { it.code }.forEach { (_, contacts) ->
+                item(key = "help-${contacts.first().code}") {
+                    HelpContactGroup(
+                        contacts = contacts,
+                        onCall = { contact ->
+                            context.startActivity(
+                                Intent(Intent.ACTION_DIAL, Uri.parse("tel:${contact.phone}"))
                             )
-                            if (index != uiState.helpContacts.lastIndex) HorizontalDivider()
                         }
-                    }
+                    )
                 }
             }
         }
@@ -182,6 +172,40 @@ private fun HelpContent(uiState: SupportUiState, onRetry: () -> Unit) {
 }
 
 @Composable
+private fun HelpContactGroup(contacts: List<HelpContact>, onCall: (HelpContact) -> Unit) {
+    val category = contacts.first()
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+    ) {
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = helpIcon(category.code),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(26.dp)
+                )
+                Text(
+                    text = category.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(start = 14.dp)
+                )
+            }
+            HorizontalDivider()
+            contacts.forEachIndexed { index, contact ->
+                HelpContactRow(contact, onCall = { onCall(contact) })
+                if (index != contacts.lastIndex) HorizontalDivider()
+            }
+        }
+    }
+}
+
+@Composable
 private fun HelpContactRow(contact: HelpContact, onCall: () -> Unit) {
     Row(
         modifier = Modifier
@@ -190,26 +214,13 @@ private fun HelpContactRow(contact: HelpContact, onCall: () -> Unit) {
             .padding(horizontal = 16.dp, vertical = 18.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector = helpIcon(contact.code),
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(26.dp)
-        )
         Column(
-            modifier = Modifier
-                .weight(1f)
-                .padding(horizontal = 14.dp)
+            modifier = Modifier.weight(1f)
         ) {
-            Text(
-                text = contact.title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Medium
-            )
             Text(
                 text = contact.contactName,
                 style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(top = 4.dp)
+                fontWeight = FontWeight.Medium
             )
             Text(
                 text = contact.phone,
@@ -224,7 +235,7 @@ private fun HelpContactRow(contact: HelpContact, onCall: () -> Unit) {
 private fun helpIcon(code: String): ImageVector = when (code) {
     "bus" -> Icons.Filled.DirectionsBus
     "pooja" -> Icons.Filled.ConfirmationNumber
-    "dharamshala" -> Icons.Filled.Hotel
+    "dharamshala", "stay" -> Icons.Filled.Hotel
     "emergency" -> Icons.Filled.LocalHospital
     else -> Icons.Filled.Phone
 }

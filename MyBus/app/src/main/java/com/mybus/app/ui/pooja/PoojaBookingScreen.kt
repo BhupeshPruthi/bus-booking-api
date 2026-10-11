@@ -52,7 +52,7 @@ fun PoojaBookingScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Book Pooja", fontWeight = FontWeight.Bold) },
+                title = { Text("Book Puja", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack, enabled = !state.isBooking) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -396,7 +396,7 @@ private fun BookingSuccessPage(
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     pooja?.let {
-                        DetailLine("Pooja", it.place)
+                        DetailLine("Puja", it.place)
                         DetailLine("Date", formatDateTime(it.scheduledAt))
                     }
                     DetailLine("Name", booking.name)
@@ -460,6 +460,6 @@ private fun bookingButtonText(bookingStatus: String, bookingOpensAt: String): St
         POOJA_BOOKING_NOT_STARTED -> "Booking Opens at ${formatDateTime(bookingOpensAt)}"
         POOJA_BOOKING_OPEN -> "Book Token"
         POOJA_BOOKING_FULL -> "No Tokens Available"
-        else -> "Pooja Expired"
+        else -> "Puja Expired"
     }
 }

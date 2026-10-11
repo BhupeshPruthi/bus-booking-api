@@ -203,7 +203,7 @@ private fun UnifiedBookingDetailsContent(
                 }
             }
             "pooja" -> {
-                item { DetailSectionTitle("Pooja details") }
+                item { DetailSectionTitle("Puja details") }
                 details.place?.let { item { DetailRowCard("Place", it) } }
                 details.tokenNumber?.let { item { DetailRowCard("Token", "#$it") } }
                 details.memberCount?.let { item { DetailRowCard("Members", it.toString()) } }

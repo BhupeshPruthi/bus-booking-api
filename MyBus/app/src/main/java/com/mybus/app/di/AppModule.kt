@@ -3,8 +3,10 @@ package com.mybus.app.di
 import android.content.Context
 import com.mybus.app.data.local.TokenManager
 import com.mybus.app.data.remote.ApiService
+import com.mybus.app.data.remote.FallbackDns
 import com.mybus.app.BuildConfig
 import com.mybus.app.data.remote.interceptor.AuthInterceptor
+import com.mybus.app.data.remote.interceptor.ChalisaGuestInterceptor
 import com.mybus.app.data.remote.interceptor.DynamicBaseUrlInterceptor
 import com.mybus.app.data.remote.interceptor.TokenAuthenticator
 import com.squareup.moshi.Moshi
@@ -14,6 +16,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import okhttp3.Dns
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -41,14 +44,22 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun provideDns(): Dns = FallbackDns.create()
+
+    @Provides
+    @Singleton
     fun provideOkHttpClient(
+        dns: Dns,
         dynamicBaseUrlInterceptor: DynamicBaseUrlInterceptor,
         authInterceptor: AuthInterceptor,
+        chalisaGuestInterceptor: ChalisaGuestInterceptor,
         tokenAuthenticator: TokenAuthenticator
     ): OkHttpClient {
         return OkHttpClient.Builder()
+            .dns(dns)
             .addInterceptor(dynamicBaseUrlInterceptor)
             .addInterceptor(authInterceptor)
+            .addInterceptor(chalisaGuestInterceptor)
             .apply {
                 if (BuildConfig.DEBUG) {
                     addInterceptor(

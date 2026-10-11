@@ -101,6 +101,15 @@ class TokenManager @Inject constructor(
         superU || type == "super_admin" || type == "stay_admin" || "stay.manage" in caps
     }
 
+    /** Hanuman Chalisa marathons: scheduling and ending are for super admins only. */
+    val canManageChalisa: Flow<Boolean> = combine(
+        isSuperUser,
+        adminType,
+        capabilities
+    ) { superU, type, caps ->
+        superU || type == "super_admin" || "chalisa.manage" in caps
+    }
+
     val canManageEvents: Flow<Boolean> = combine(
         isSuperUser,
         adminType,

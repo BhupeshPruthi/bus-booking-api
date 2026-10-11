@@ -7,6 +7,7 @@ import com.mybus.app.data.remote.dto.StayBooking
 import com.mybus.app.data.remote.dto.StayCancellation
 import com.mybus.app.data.remote.dto.StayCoupon
 import com.mybus.app.data.remote.dto.StayDailyOccupancyReport
+import com.mybus.app.data.remote.dto.StayDailyOccupancyBookings
 import com.mybus.app.data.remote.dto.CreateStayBookingRequest
 import com.mybus.app.data.repository.StayRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -26,9 +27,13 @@ data class StayAdminUiState(
     val bookingSearch: String = "",
     val bookingPage: Int = 1,
     val bookingTotal: Int = 0,
+    val exportBookings: List<StayBooking>? = null,
+    val isExporting: Boolean = false,
     val pendingTotal: Int = 0,
     val confirmedTotal: Int = 0,
     val dailyOccupancy: StayDailyOccupancyReport? = null,
+    val selectedOccupancyDate: String? = null,
+    val occupancyDayDetails: StayDailyOccupancyBookings? = null,
     val cancellations: List<StayCancellation> = emptyList(),
     val cancellationPage: Int = 1,
     val cancellationTotal: Int = 0,
@@ -74,11 +79,24 @@ class StayAdminViewModel @Inject constructor(
         }
     }
 
-    fun loadBookings(status: String?, search: String = "", reset: Boolean = true) {
+    fun loadBookings(
+        status: String?,
+        search: String = "",
+        reset: Boolean = true,
+        fromDate: String? = null,
+        toDate: String? = null
+    ) {
         val nextPage = if (reset) 1 else _uiState.value.bookingPage + 1
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
-            repository.getAdminBookings(status, search.ifBlank { null }, nextPage, 50)
+            repository.getAdminBookings(
+                status,
+                search.ifBlank { null },
+                fromDate,
+                toDate,
+                nextPage,
+                50
+            )
                 .onSuccess { page ->
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
@@ -91,6 +109,36 @@ class StayAdminViewModel @Inject constructor(
                 }
                 .onFailure { showError(it, "Failed to load Stay bookings") }
         }
+    }
+
+    fun exportLastMonthRecords() {
+        val today = java.time.LocalDate.now()
+        val fromDate = today.minusMonths(1).toString()
+        val toDate = today.plusDays(1).toString()
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isExporting = true, error = null)
+            val records = mutableListOf<StayBooking>()
+            var page = 1
+            do {
+                val result = repository.getAdminBookings(
+                    fromDate = fromDate,
+                    toDate = toDate,
+                    page = page,
+                    limit = 100
+                )
+                val response = result.getOrElse {
+                    showError(it, "Failed to load Stay records for export")
+                    return@launch
+                }
+                records += response.items
+                page += 1
+            } while (records.size < response.total)
+            _uiState.value = _uiState.value.copy(isExporting = false, exportBookings = records)
+        }
+    }
+
+    fun consumeExport() {
+        _uiState.value = _uiState.value.copy(exportBookings = null)
     }
 
     fun loadCancellations(reset: Boolean = true) {
@@ -123,6 +171,26 @@ class StayAdminViewModel @Inject constructor(
                     )
                 }
                 .onFailure { showError(it, "Failed to load daily occupancy") }
+        }
+    }
+
+    fun loadDailyOccupancyBookings(date: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                isLoading = true,
+                error = null,
+                selectedOccupancyDate = date,
+                occupancyDayDetails = _uiState.value.occupancyDayDetails
+                    ?.takeIf { it.date == date }
+            )
+            repository.getDailyOccupancyBookings(date)
+                .onSuccess { details ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        occupancyDayDetails = details
+                    )
+                }
+                .onFailure { showError(it, "Failed to load bookings for this day") }
         }
     }
 
@@ -237,6 +305,7 @@ class StayAdminViewModel @Inject constructor(
     private fun showError(error: Throwable, fallback: String) {
         _uiState.value = _uiState.value.copy(
             isLoading = false,
+            isExporting = false,
             error = error.message ?: fallback
         )
     }
