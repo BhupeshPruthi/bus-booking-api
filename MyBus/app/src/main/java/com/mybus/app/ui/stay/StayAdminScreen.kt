@@ -431,6 +431,8 @@ private fun DailyOccupancyPage(
     val upcomingDays = remember(days, today) { days.filter { it.date >= today } }
     val pastDays = remember(days, today) { days.filter { it.date < today }.reversed() }
     val shownDays = if (selectedTab == OccupancyTab.UPCOMING) upcomingDays else pastDays
+    val bookedDays = remember(shownDays) { shownDays.filter { it.bookingCount > 0 } }
+    val context = LocalContext.current
 
     Column(Modifier.fillMaxSize()) {
         TabRow(selectedTabIndex = selectedTab.ordinal) {
@@ -440,6 +442,16 @@ private fun DailyOccupancyPage(
                     onClick = { onTabSelected(tab) },
                     text = { Text(tab.title) }
                 )
+            }
+        }
+        if (report != null && bookedDays.isNotEmpty()) {
+            OutlinedButton(
+                onClick = { exportDailyOccupancy(context, selectedTab, bookedDays, shownDays) },
+                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 12.dp)
+            ) {
+                Icon(Icons.Filled.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Export ${selectedTab.title.lowercase()} as PDF")
             }
         }
 
@@ -524,6 +536,150 @@ private fun DailyOccupancyCard(day: StayDailyOccupancyDay, onClick: () -> Unit) 
             }
         }
     }
+}
+
+/** Shares a PDF of the tab's days that have bookings (days with no bookings are left out). */
+private fun exportDailyOccupancy(
+    context: Context,
+    tab: OccupancyTab,
+    bookedDays: List<StayDailyOccupancyDay>,
+    shownDays: List<StayDailyOccupancyDay>
+) {
+    runCatching {
+        val pdfFile = createDailyOccupancyPdf(context, tab, bookedDays, shownDays)
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", pdfFile)
+        val title = "Daily Occupancy - ${tab.title}"
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "application/pdf"
+            putExtra(Intent.EXTRA_SUBJECT, title)
+            putExtra(Intent.EXTRA_STREAM, uri)
+            clipData = ClipData.newUri(context.contentResolver, title, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(Intent.createChooser(intent, "Share Daily Occupancy"))
+    }.onFailure {
+        Toast.makeText(context, "Unable to export daily occupancy PDF", Toast.LENGTH_LONG).show()
+    }
+}
+
+private fun createDailyOccupancyPdf(
+    context: Context,
+    tab: OccupancyTab,
+    bookedDays: List<StayDailyOccupancyDay>,
+    shownDays: List<StayDailyOccupancyDay>
+): File {
+    val india = ZoneId.of("Asia/Kolkata")
+    val exportDir = File(context.cacheDir, "exports").apply { mkdirs() }
+    val slug = if (tab == OccupancyTab.UPCOMING) "upcoming" else "past_3_months"
+    val pdfFile = File(exportDir, "daily_occupancy_${slug}_${LocalDate.now(india)}.pdf")
+    val document = PdfDocument()
+    val pageWidth = 595
+    val pageHeight = 842
+    val margin = 40f
+    val contentWidth = pageWidth - (margin * 2)
+    val right = pageWidth - margin
+    var pageNumber = 1
+    lateinit var page: PdfDocument.Page
+    lateinit var canvas: Canvas
+    var y = margin
+
+    val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.BLACK
+        textSize = 20f
+        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+    }
+    val dayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.BLACK
+        textSize = 13f
+        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+    }
+    val amountPaint = Paint(dayPaint).apply { textAlign = Paint.Align.RIGHT }
+    val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.rgb(40, 40, 40)
+        textSize = 11f
+    }
+    val bodyRightPaint = Paint(bodyPaint).apply { textAlign = Paint.Align.RIGHT }
+    val mutedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.rgb(95, 95, 95)
+        textSize = 10f
+    }
+    val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.rgb(210, 210, 210)
+        strokeWidth = 1f
+    }
+
+    fun startPage() {
+        page = document.startPage(PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create())
+        canvas = page.canvas
+        y = margin
+        pageNumber += 1
+    }
+    fun ensureSpace(required: Float) {
+        if (y + required > pageHeight - margin) {
+            document.finishPage(page)
+            startPage()
+        }
+    }
+    fun drawWrapped(text: String, paint: Paint, extraBottom: Float = 4f) {
+        wrapStayPdfText(text, paint, contentWidth).forEach { line ->
+            ensureSpace(paint.textSize + 8f)
+            canvas.drawText(line, margin, y, paint)
+            y += paint.textSize + 5f
+        }
+        y += extraBottom
+    }
+    fun drawSeparator() {
+        ensureSpace(12f)
+        canvas.drawLine(margin, y, right, y, linePaint)
+        y += 12f
+    }
+
+    val range = if (shownDays.isEmpty()) "" else {
+        val dates = shownDays.map { it.date }.sorted()
+        "${formatOccupancyDate(dates.first())} to ${formatOccupancyDate(dates.last())}"
+    }
+    val totalEarnings = bookedDays.sumOf { it.totalEarnings }
+    val generatedAt = java.time.ZonedDateTime.now(india)
+        .format(DateTimeFormatter.ofPattern("dd MMM yyyy, h:mm a", java.util.Locale.ENGLISH))
+
+    startPage()
+    drawWrapped("Daily Occupancy - ${tab.title}", titlePaint, extraBottom = 6f)
+    if (range.isNotEmpty()) drawWrapped(range, bodyPaint)
+    drawWrapped(
+        "${bookedDays.size} ${if (bookedDays.size == 1) "day" else "days"} with bookings · " +
+            "Total earnings ₹${totalEarnings.asRupees()}",
+        bodyPaint
+    )
+    drawWrapped("Days with no bookings are not listed. Generated $generatedAt (India time).", mutedPaint, extraBottom = 8f)
+    drawSeparator()
+
+    bookedDays.forEach { day ->
+        val units = day.unitTypes.filter { it.bookedUnits > 0 }
+        // Keeps a day's heading and its rooms on the same page.
+        ensureSpace(40f + units.size * 16f)
+        canvas.drawText(formatOccupancyDate(day.date), margin, y, dayPaint)
+        canvas.drawText("₹${day.totalEarnings.asRupees()}", right, y, amountPaint)
+        y += dayPaint.textSize + 6f
+        drawWrapped("${day.bookingCount} ${if (day.bookingCount == 1) "booking" else "bookings"}", mutedPaint, extraBottom = 2f)
+        units.forEach { unit ->
+            ensureSpace(bodyPaint.textSize + 8f)
+            canvas.drawText(unit.displayName, margin + 12f, y, bodyPaint)
+            canvas.drawText(
+                "${unit.bookedUnits} of ${unit.totalUnits} booked · ${unit.availableUnits} available",
+                right,
+                y,
+                bodyRightPaint
+            )
+            y += bodyPaint.textSize + 5f
+        }
+        y += 4f
+        drawSeparator()
+    }
+
+    document.finishPage(page)
+    FileOutputStream(pdfFile).use { document.writeTo(it) }
+    document.close()
+    return pdfFile
 }
 
 private fun formatOccupancyDate(value: String): String = runCatching {
