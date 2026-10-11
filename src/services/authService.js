@@ -79,6 +79,9 @@ class AuthService {
     await db.transaction(async (trx) => {
       await trx('refresh_tokens').where('user_id', userId).del();
       await trx('users').where('id', userId).update({ name: 'Deleted User', email: deletedEmail, mobile: null, google_sub: null, apple_sub: null, deleted_at: trx.fn.now(), updated_at: trx.fn.now() });
+      // After marking the user deleted (which waits for any Chalisa write holding the user row),
+      // remove their Hanuman Chalisa readings and board entries (cascade).
+      await trx('chalisa_participants').where('user_id', userId).del();
     });
   }
   /**

@@ -9,6 +9,7 @@ const CAPABILITIES = Object.freeze({
   POOJA_MANAGE: 'pooja.manage',
   STAY_MANAGE: 'stay.manage',
   EVENT_MANAGE: 'event.manage',
+  CHALISA_MANAGE: 'chalisa.manage',
 });
 
 function normalizeAdminType(user) {

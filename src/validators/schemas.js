@@ -351,6 +351,77 @@ const paymentActionSchema = Joi.object({
   }),
 });
 
+// ============ HANUMAN CHALISA SCHEMAS ============
+
+const chalisaParticipantSchema = Joi.object({
+  displayName: Joi.string().trim().min(2).max(40).required(),
+});
+
+const chalisaReadingSchema = Joi.object({
+  clientRequestId: Joi.string().uuid().required(),
+  startingCount: Joi.number().integer().min(1).max(5000),
+});
+
+const chalisaReadingParamsSchema = Joi.object({
+  clientRequestId: Joi.string().uuid().required(),
+});
+
+const chalisaMyStatsQuerySchema = Joi.object({
+  month: Joi.string().pattern(/^\d{4}-(0[1-9]|1[0-2])$/).messages({
+    'string.pattern.base': 'month must be in YYYY-MM format',
+  }),
+});
+
+const chalisaBoardQuerySchema = Joi.object({
+  limit: Joi.number().integer().min(1).max(200).default(100),
+  offset: Joi.number().integer().min(0).default(0),
+});
+
+const chalisaArchiveQuerySchema = Joi.object({
+  limit: Joi.number().integer().min(1).max(50).default(20),
+});
+
+const chalisaMarathonParamsSchema = Joi.object({
+  id: Joi.string().uuid().required(),
+});
+
+// Date.parse rolls impossible dates over (30 Feb becomes 2 Mar), so check the written parts.
+function isRealCalendarTime(value) {
+  const [, y, mo, d, h, mi, s = '0'] = value.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/) || [];
+  if (!y) return false;
+  const parts = [y, mo, d, h, mi, s].map(Number);
+  const utc = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2], parts[3], parts[4], parts[5]));
+  return utc.getUTCFullYear() === parts[0] && utc.getUTCMonth() === parts[1] - 1 && utc.getUTCDate() === parts[2] &&
+    utc.getUTCHours() === parts[3] && utc.getUTCMinutes() === parts[4] && utc.getUTCSeconds() === parts[5];
+}
+
+// Start times must say their time zone ("Z" or "+05:30"), so they're never read as UTC by mistake.
+// (Joi's isoDate() would first convert a zone-less time using the server's own zone.)
+const chalisaStartsAt = Joi.string()
+  .pattern(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})$/)
+  .custom((value, helpers) => (isRealCalendarTime(value) ? value : helpers.error('string.pattern.base')))
+  .messages({
+    'string.pattern.base': 'startsAt must be a date and time with a time zone, for example 2026-10-12T06:00:00+05:30',
+  });
+
+const chalisaScheduleMarathonSchema = Joi.object({
+  title: Joi.string().trim().min(2).max(120).required(),
+  startsAt: chalisaStartsAt,
+  goal: Joi.number().integer().min(1).max(1000000000).allow(null),
+});
+
+const chalisaUpdateMarathonSchema = Joi.object({
+  title: Joi.string().trim().min(2).max(120),
+  startsAt: chalisaStartsAt,
+  goal: Joi.number().integer().min(1).max(1000000000).allow(null),
+}).min(1);
+
+const chalisaEndMarathonSchema = Joi.object({
+  confirmText: Joi.string().valid('END').required().messages({
+    'any.only': 'Type END to confirm',
+  }),
+});
+
 module.exports = {
   // Common
   uuidSchema,
@@ -364,6 +435,18 @@ module.exports = {
   // Feedback
   createFeedbackSchema,
   feedbackListSchema,
+
+  // Hanuman Chalisa
+  chalisaParticipantSchema,
+  chalisaReadingSchema,
+  chalisaReadingParamsSchema,
+  chalisaMyStatsQuerySchema,
+  chalisaBoardQuerySchema,
+  chalisaArchiveQuerySchema,
+  chalisaMarathonParamsSchema,
+  chalisaScheduleMarathonSchema,
+  chalisaUpdateMarathonSchema,
+  chalisaEndMarathonSchema,
 
   // Profile
   updateProfileSchema,

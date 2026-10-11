@@ -14,6 +14,7 @@ const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
 const consumerRoutes = require('./routes/consumer');
 const stayRoutes = require('./routes/stay');
+const chalisaRoutes = require('./routes/chalisa');
 
 // Import cron jobs
 const { startExpireBookingsJob } = require('./jobs/expireBookings');
@@ -86,6 +87,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/stays', stayRoutes);
+app.use('/api/chalisa', chalisaRoutes);
 app.use('/api', consumerRoutes);
 
 // 404 handler

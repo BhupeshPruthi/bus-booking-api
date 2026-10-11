@@ -2,6 +2,7 @@ const express = require('express');
 const adminController = require('../controllers/adminController');
 const stayAdminController = require('../controllers/stayAdminController');
 const feedbackController = require('../controllers/feedbackController');
+const chalisaController = require('../controllers/chalisaController');
 const { authenticate } = require('../middlewares/authenticate');
 const {
   busAdminOrSuperUser,
@@ -9,6 +10,7 @@ const {
   eventAdminOrSuperUser,
   stayAdminOrSuperUser,
   anyAdminOrSuperUser,
+  chalisaSuperAdmin,
 } = require('../middlewares/authorize');
 const { eventImageUpload, handleMulterError } = require('../middlewares/upload');
 const validate = require('../middlewares/validate');
@@ -31,11 +33,77 @@ const {
   createStayBookingSchema,
   createStayCouponSchema,
   feedbackListSchema,
+  chalisaMarathonParamsSchema,
+  chalisaScheduleMarathonSchema,
+  chalisaUpdateMarathonSchema,
+  chalisaEndMarathonSchema,
 } = require('../validators/schemas');
 
 const router = express.Router();
 
 router.use(authenticate);
+
+/**
+ * @route POST /api/admin/chalisa/marathons
+ * @desc Schedule the next Hanuman Chalisa marathon (shows on everyone's Home page at once)
+ * @access Super Admin
+ */
+router.post(
+  '/chalisa/marathons',
+  chalisaSuperAdmin,
+  validate(chalisaScheduleMarathonSchema),
+  chalisaController.scheduleMarathon
+);
+
+/**
+ * @route PATCH /api/admin/chalisa/marathons/:id
+ * @desc Edit the name or goal; the start time only before it starts
+ * @access Super Admin
+ */
+router.patch(
+  '/chalisa/marathons/:id',
+  chalisaSuperAdmin,
+  validate(chalisaMarathonParamsSchema, 'params'),
+  validate(chalisaUpdateMarathonSchema),
+  chalisaController.updateMarathon
+);
+
+/**
+ * @route DELETE /api/admin/chalisa/marathons/:id
+ * @desc Cancel a marathon that hasn't started
+ * @access Super Admin
+ */
+router.delete(
+  '/chalisa/marathons/:id',
+  chalisaSuperAdmin,
+  validate(chalisaMarathonParamsSchema, 'params'),
+  chalisaController.cancelMarathon
+);
+
+/**
+ * @route POST /api/admin/chalisa/marathons/:id/end
+ * @desc End the running marathon and archive it with its final totals
+ * @access Super Admin
+ */
+router.post(
+  '/chalisa/marathons/:id/end',
+  chalisaSuperAdmin,
+  validate(chalisaMarathonParamsSchema, 'params'),
+  validate(chalisaEndMarathonSchema),
+  chalisaController.endMarathon
+);
+
+/**
+ * @route POST /api/admin/chalisa/marathons/:id/restore
+ * @desc Undo ending a marathon, within 10 minutes
+ * @access Super Admin
+ */
+router.post(
+  '/chalisa/marathons/:id/restore',
+  chalisaSuperAdmin,
+  validate(chalisaMarathonParamsSchema, 'params'),
+  chalisaController.restoreMarathon
+);
 
 /**
  * @route POST /api/admin/events
