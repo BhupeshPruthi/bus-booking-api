@@ -41,15 +41,15 @@ val hasReleaseKeystore = keystorePropertiesFile.exists()
 
 android {
     namespace = "com.mybus.app"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         // Must match Google Cloud OAuth "Android" client package name (Play / Sign-In).
         applicationId = "com.bolguru.balajisevak"
         minSdk = 24
-        targetSdk = 35
-        versionCode = 5
-        versionName = "1.0.2"
+        targetSdk = 36
+        versionCode = 12
+        versionName = "1.0.9"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -85,6 +85,8 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // java.time (dates, India time zone) on Android 7 (API 24/25), which lacks it.
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -130,6 +132,8 @@ dependencies {
     implementation("com.squareup.retrofit2:converter-moshi:2.11.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+    implementation("com.squareup.okhttp3:okhttp-dnsoverhttps:4.12.0")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
     implementation("io.coil-kt:coil-compose:2.7.0")
 
     // Moshi

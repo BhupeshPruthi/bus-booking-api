@@ -1,5 +1,6 @@
 package com.mybus.app.data.repository
 
+import com.mybus.app.data.remote.networkErrorMessage
 import com.mybus.app.data.remote.ApiService
 import com.mybus.app.data.remote.dto.*
 import retrofit2.Response
@@ -35,7 +36,38 @@ class PoojaRepository @Inject constructor(
                 Result.failure(Exception(msg))
             }
         } catch (e: Exception) {
-            Result.failure(Exception("Network error: ${e.message}"))
+            Result.failure(Exception(networkErrorMessage(e)))
+        }
+    }
+
+    suspend fun updatePooja(
+        poojaId: String,
+        request: UpdatePoojaRequest
+    ): Result<PoojaDetailData> {
+        return try {
+            val response = apiService.updatePooja(poojaId, request)
+            if (response.isSuccessful && response.body()?.success == true) {
+                Result.success(response.body()!!.data!!)
+            } else {
+                val msg = errorMessage(response, "Failed to update pooja")
+                Result.failure(Exception(msg))
+            }
+        } catch (e: Exception) {
+            Result.failure(Exception(networkErrorMessage(e)))
+        }
+    }
+
+    suspend fun deletePooja(poojaId: String): Result<DeletePoojaResult> {
+        return try {
+            val response = apiService.deletePooja(poojaId)
+            if (response.isSuccessful && response.body()?.success == true) {
+                Result.success(response.body()!!.data!!)
+            } else {
+                val msg = errorMessage(response, "Failed to delete pooja")
+                Result.failure(Exception(msg))
+            }
+        } catch (e: Exception) {
+            Result.failure(Exception(networkErrorMessage(e)))
         }
     }
 
@@ -49,7 +81,7 @@ class PoojaRepository @Inject constructor(
                 Result.failure(Exception(msg))
             }
         } catch (e: Exception) {
-            Result.failure(Exception("Network error: ${e.message}"))
+            Result.failure(Exception(networkErrorMessage(e)))
         }
     }
 
@@ -63,7 +95,7 @@ class PoojaRepository @Inject constructor(
                 Result.failure(Exception(msg))
             }
         } catch (e: Exception) {
-            Result.failure(Exception("Network error: ${e.message}"))
+            Result.failure(Exception(networkErrorMessage(e)))
         }
     }
 
@@ -77,7 +109,7 @@ class PoojaRepository @Inject constructor(
                 Result.failure(Exception(msg))
             }
         } catch (e: Exception) {
-            Result.failure(Exception("Network error: ${e.message}"))
+            Result.failure(Exception(networkErrorMessage(e)))
         }
     }
 
@@ -91,7 +123,7 @@ class PoojaRepository @Inject constructor(
                 Result.failure(Exception(msg))
             }
         } catch (e: Exception) {
-            Result.failure(Exception("Network error: ${e.message}"))
+            Result.failure(Exception(networkErrorMessage(e)))
         }
     }
 
@@ -114,7 +146,7 @@ class PoojaRepository @Inject constructor(
                 Result.failure(Exception(msg))
             }
         } catch (e: Exception) {
-            Result.failure(Exception("Network error: ${e.message}"))
+            Result.failure(Exception(networkErrorMessage(e)))
         }
     }
 
@@ -130,7 +162,7 @@ class PoojaRepository @Inject constructor(
                 Result.failure(Exception(msg))
             }
         } catch (e: Exception) {
-            Result.failure(Exception("Network error: ${e.message}"))
+            Result.failure(Exception(networkErrorMessage(e)))
         }
     }
 
@@ -147,7 +179,7 @@ class PoojaRepository @Inject constructor(
                 Result.failure(Exception(msg))
             }
         } catch (e: Exception) {
-            Result.failure(Exception("Network error: ${e.message}"))
+            Result.failure(Exception(networkErrorMessage(e)))
         }
     }
 }

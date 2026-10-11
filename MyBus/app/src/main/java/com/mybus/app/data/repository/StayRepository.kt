@@ -90,18 +90,25 @@ class StayRepository @Inject constructor(
     suspend fun getAdminBookings(
         status: String? = null,
         search: String? = null,
+        fromDate: String? = null,
+        toDate: String? = null,
         page: Int = 1,
         limit: Int = 50
     ) = request("Failed to load Stay bookings") {
-        apiService.getAdminStayBookings(status, search, page, limit)
+        apiService.getAdminStayBookings(status, search, fromDate, toDate, page, limit)
     }
 
     suspend fun createAdminBooking(body: CreateStayBookingRequest) =
         request("Failed to create Stay booking") { apiService.createAdminStayBooking(body) }
 
-    suspend fun getDailyOccupancy(days: Int = 30) =
+    suspend fun getDailyOccupancy() =
         request("Failed to load daily occupancy") {
-            apiService.getStayDailyOccupancy(days)
+            apiService.getStayDailyOccupancy()
+        }
+
+    suspend fun getDailyOccupancyBookings(date: String) =
+        request("Failed to load bookings for this day") {
+            apiService.getStayDailyOccupancyBookings(date)
         }
 
     suspend fun confirmBooking(id: String) = request("Failed to confirm booking") {

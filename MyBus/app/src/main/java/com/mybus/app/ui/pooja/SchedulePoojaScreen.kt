@@ -42,11 +42,11 @@ fun SchedulePoojaScreen(
 
     val scrollState = rememberScrollState()
 
-    if (uiState.createdPooja != null) {
-        val pooja = uiState.createdPooja!!
+    if (uiState.savedPooja != null) {
+        val pooja = uiState.savedPooja!!
         AlertDialog(
             onDismissRequest = { viewModel.dismissSuccess(); onBack() },
-            title = { Text("Pooja Scheduled") },
+            title = { Text(if (uiState.isEditMode) "Puja Updated" else "Puja Scheduled") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Place: ${pooja.place}")
@@ -64,7 +64,12 @@ fun SchedulePoojaScreen(
         contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
         topBar = {
             TopAppBar(
-                title = { Text("Schedule Pooja", fontWeight = FontWeight.Bold) },
+                title = {
+                    Text(
+                        if (uiState.isEditMode) "Edit Puja" else "Schedule Puja",
+                        fontWeight = FontWeight.Bold
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -87,7 +92,11 @@ fun SchedulePoojaScreen(
             }
 
             Text(
-                text = "Create a new pooja schedule for users to book tokens.",
+                text = if (uiState.isEditMode) {
+                    "Update this puja schedule. Existing bookings will remain valid."
+                } else {
+                    "Create a new puja schedule for users to book tokens."
+                },
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -125,9 +134,17 @@ fun SchedulePoojaScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
+            if (uiState.isEditMode && uiState.minimumTokenCount > 1) {
+                Text(
+                    text = "Minimum ${uiState.minimumTokenCount} tokens because confirmed token numbers must remain valid.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
             Button(
-                onClick = { viewModel.createPooja() },
-                enabled = !uiState.isLoading,
+                onClick = { viewModel.savePooja() },
+                enabled = !uiState.isLoading && uiState.date != null && uiState.time != null,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp)
@@ -139,7 +156,10 @@ fun SchedulePoojaScreen(
                         strokeWidth = 2.dp
                     )
                 } else {
-                    Text("Schedule Pooja", textAlign = TextAlign.Center)
+                    Text(
+                        if (uiState.isEditMode) "Save Changes" else "Schedule Puja",
+                        textAlign = TextAlign.Center
+                    )
                 }
             }
         }
@@ -214,4 +234,3 @@ private fun formatDateTime(isoString: String): String {
         isoString
     }
 }
-

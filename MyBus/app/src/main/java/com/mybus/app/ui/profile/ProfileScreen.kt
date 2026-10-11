@@ -1,6 +1,8 @@
 package com.mybus.app.ui.profile
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Logout
@@ -18,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mybus.app.BuildConfig
+import com.mybus.app.ui.chalisa.ChalisaProfileSection
 import com.mybus.app.ui.theme.MyBusTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -25,6 +28,7 @@ import com.mybus.app.ui.theme.MyBusTheme
 fun ProfileScreen(
     onLogout: () -> Unit,
     onBack: (() -> Unit)? = null,
+    onOpenChalisa: () -> Unit = {},
     profileViewModel: ProfileViewModel = hiltViewModel()
 ) {
     val userMobile by profileViewModel.userMobile.collectAsStateWithLifecycle(initialValue = null)
@@ -72,6 +76,7 @@ fun ProfileScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp)
         ) {
             Spacer(modifier = Modifier.height(16.dp))
@@ -137,6 +142,10 @@ fun ProfileScreen(
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            ChalisaProfileSection(onOpen = onOpenChalisa)
 
             Spacer(modifier = Modifier.height(24.dp))
 

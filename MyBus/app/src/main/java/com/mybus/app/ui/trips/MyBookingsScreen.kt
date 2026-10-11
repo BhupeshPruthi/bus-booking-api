@@ -273,7 +273,7 @@ private fun EmptyUnifiedBookings(bucket: String) {
     val (icon, message) = when (bucket) {
         "past" -> Icons.Filled.History to "No past bookings yet."
         "failed" -> Icons.Filled.ErrorOutline to "No cancelled, rejected, or expired bookings."
-        else -> Icons.Filled.Luggage to "No upcoming Bus, Stay, or Pooja bookings."
+        else -> Icons.Filled.Luggage to "No upcoming Bus, Stay, or Puja bookings."
     }
     Column(
         Modifier.fillMaxSize().padding(24.dp),
@@ -289,7 +289,7 @@ private fun EmptyUnifiedBookings(bucket: String) {
 internal fun String.bookingTypeLabel(): String = when (this) {
     "bus" -> "Bus"
     "stay" -> "Stay"
-    "pooja" -> "Pooja"
+    "pooja" -> "Puja"
     else -> replaceFirstChar(Char::titlecase)
 }
 

@@ -1,5 +1,6 @@
 package com.mybus.app.data.repository
 
+import com.mybus.app.data.remote.networkErrorMessage
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -50,7 +51,7 @@ class EventRepository @Inject constructor(
                 Result.failure(Exception(msg))
             }
         } catch (e: Exception) {
-            Result.failure(Exception("Network error: ${e.message}"))
+            Result.failure(Exception(networkErrorMessage(e)))
         }
     }
 

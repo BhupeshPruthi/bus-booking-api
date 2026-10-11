@@ -1,5 +1,6 @@
 package com.mybus.app.data.repository
 
+import com.mybus.app.data.remote.networkErrorMessage
 import com.mybus.app.data.remote.ApiService
 import com.mybus.app.data.remote.dto.*
 import retrofit2.Response
@@ -38,7 +39,7 @@ class BusRepository @Inject constructor(
                 Result.failure(Exception(msg))
             }
         } catch (e: Exception) {
-            Result.failure(Exception("Network error: ${e.message}"))
+            Result.failure(Exception(networkErrorMessage(e)))
         }
     }
 
@@ -52,7 +53,7 @@ class BusRepository @Inject constructor(
                 Result.failure(Exception(msg))
             }
         } catch (e: Exception) {
-            Result.failure(Exception("Network error: ${e.message}"))
+            Result.failure(Exception(networkErrorMessage(e)))
         }
     }
 
@@ -66,7 +67,7 @@ class BusRepository @Inject constructor(
                 Result.failure(Exception(msg))
             }
         } catch (e: Exception) {
-            Result.failure(Exception("Network error: ${e.message}"))
+            Result.failure(Exception(networkErrorMessage(e)))
         }
     }
 
@@ -80,7 +81,7 @@ class BusRepository @Inject constructor(
                 Result.failure(Exception(msg))
             }
         } catch (e: Exception) {
-            Result.failure(Exception("Network error: ${e.message}"))
+            Result.failure(Exception(networkErrorMessage(e)))
         }
     }
 
@@ -126,7 +127,7 @@ class BusRepository @Inject constructor(
                 Result.failure(Exception(msg))
             }
         } catch (e: Exception) {
-            Result.failure(Exception("Network error: ${e.message}"))
+            Result.failure(Exception(networkErrorMessage(e)))
         }
     }
 
@@ -142,7 +143,7 @@ class BusRepository @Inject constructor(
                 Result.failure(Exception(msg))
             }
         } catch (e: Exception) {
-            Result.failure(Exception("Network error: ${e.message}"))
+            Result.failure(Exception(networkErrorMessage(e)))
         }
     }
 
@@ -156,7 +157,7 @@ class BusRepository @Inject constructor(
                 Result.failure(Exception(msg))
             }
         } catch (e: Exception) {
-            Result.failure(Exception("Network error: ${e.message}"))
+            Result.failure(Exception(networkErrorMessage(e)))
         }
     }
 
@@ -170,7 +171,7 @@ class BusRepository @Inject constructor(
                 Result.failure(Exception(msg))
             }
         } catch (e: Exception) {
-            Result.failure(Exception("Network error: ${e.message}"))
+            Result.failure(Exception(networkErrorMessage(e)))
         }
     }
 
@@ -187,7 +188,7 @@ class BusRepository @Inject constructor(
                 Result.failure(Exception(msg))
             }
         } catch (e: Exception) {
-            Result.failure(Exception("Network error: ${e.message}"))
+            Result.failure(Exception(networkErrorMessage(e)))
         }
     }
 
@@ -201,7 +202,7 @@ class BusRepository @Inject constructor(
                 Result.failure(Exception(msg))
             }
         } catch (e: Exception) {
-            Result.failure(Exception("Network error: ${e.message}"))
+            Result.failure(Exception(networkErrorMessage(e)))
         }
     }
 
@@ -215,7 +216,7 @@ class BusRepository @Inject constructor(
                 Result.failure(Exception(msg))
             }
         } catch (e: Exception) {
-            Result.failure(Exception("Network error: ${e.message}"))
+            Result.failure(Exception(networkErrorMessage(e)))
         }
     }
 }

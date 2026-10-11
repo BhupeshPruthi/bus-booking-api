@@ -43,7 +43,7 @@ fun UpcomingPoojaListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Upcoming Pooja", fontWeight = FontWeight.Bold) },
+                title = { Text("Upcoming Puja", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -92,7 +92,7 @@ fun UpcomingPoojaListScreen(
                         )
                         Spacer(Modifier.height(16.dp))
                         Text(
-                            text = "No upcoming pooja found",
+                            text = "No upcoming Puja found",
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center
@@ -192,4 +192,3 @@ private fun formatDateTime(isoString: String): String {
         isoString
     }
 }
-

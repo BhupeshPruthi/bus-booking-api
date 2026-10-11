@@ -15,6 +15,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.ConfirmationNumber
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
@@ -47,15 +49,25 @@ import java.time.format.DateTimeFormatter
 fun PoojaDetailScreen(
     isAdmin: Boolean,
     onBack: () -> Unit,
+    onEdit: (poojaId: String) -> Unit,
+    onDeleted: () -> Unit,
     onBookTokenClick: (poojaId: String) -> Unit,
     viewModel: PoojaDetailViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     var bookingToCancel by remember { mutableStateOf<PoojaBookingData?>(null) }
+    var showDeleteConfirmation by remember { mutableStateOf(false) }
 
     LaunchedEffect(isAdmin) {
         viewModel.load(isAdmin)
+    }
+
+    LaunchedEffect(state.deletionMessage) {
+        state.deletionMessage?.let { message ->
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+            onDeleted()
+        }
     }
 
     if (state.error != null) {
@@ -106,10 +118,47 @@ fun PoojaDetailScreen(
         )
     }
 
+    if (showDeleteConfirmation) {
+        val bookingCount = state.pooja?.bookings.orEmpty().size
+        AlertDialog(
+            onDismissRequest = { if (!state.isDeleting) showDeleteConfirmation = false },
+            title = { Text("Delete Puja Schedule") },
+            text = {
+                Text(
+                    if (bookingCount > 0) {
+                        "This schedule has booking history. The schedule and all confirmed tokens will be cancelled, while the history is preserved."
+                    } else {
+                        "This schedule has no bookings and will be permanently deleted. This cannot be undone."
+                    }
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteConfirmation = false
+                        viewModel.deletePooja()
+                    },
+                    enabled = !state.isDeleting,
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text(if (bookingCount > 0) "Cancel Schedule" else "Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showDeleteConfirmation = false },
+                    enabled = !state.isDeleting
+                ) {
+                    Text("Keep")
+                }
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Pooja Details", fontWeight = FontWeight.Bold) },
+                title = { Text("Puja Details", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -118,6 +167,31 @@ fun PoojaDetailScreen(
                 actions = {
                     val pooja = state.pooja
                     val bookings = pooja?.bookings.orEmpty()
+                    val canManage = isAdmin && pooja != null &&
+                        pooja.status == "scheduled" &&
+                        poojaBookingStatus(
+                            scheduledAt = pooja.scheduledAt,
+                            availableTokens = pooja.availableTokens,
+                            serverStatus = pooja.bookingStatus
+                        ) != POOJA_BOOKING_EXPIRED
+                    if (canManage) {
+                        IconButton(
+                            onClick = { onEdit(pooja!!.id) },
+                            enabled = !state.isDeleting
+                        ) {
+                            Icon(Icons.Filled.Edit, contentDescription = "Edit puja schedule")
+                        }
+                        IconButton(
+                            onClick = { showDeleteConfirmation = true },
+                            enabled = !state.isDeleting
+                        ) {
+                            Icon(
+                                Icons.Filled.Delete,
+                                contentDescription = "Delete puja schedule",
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
                     if (isAdmin && pooja != null && bookings.isNotEmpty()) {
                         TextButton(onClick = { exportPoojaBookings(context, pooja, bookings) }) {
                             Icon(Icons.Filled.Share, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -419,7 +493,7 @@ private fun bookingButtonText(bookingStatus: String, bookingOpensAt: String): St
         POOJA_BOOKING_NOT_STARTED -> "Booking Opens at ${formatDateTime(bookingOpensAt)}"
         POOJA_BOOKING_OPEN -> "Book Token"
         POOJA_BOOKING_FULL -> "No Tokens Available"
-        else -> "Pooja Expired"
+        else -> "Puja Expired"
     }
 }
 
@@ -435,7 +509,7 @@ private fun exportPoojaBookings(
             "${context.packageName}.fileprovider",
             pdfFile
         )
-        val title = "Pooja Token Bookings - ${pooja.place}"
+        val title = "Puja Token Bookings - ${pooja.place}"
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = "application/pdf"
             putExtra(Intent.EXTRA_SUBJECT, title)
@@ -443,7 +517,7 @@ private fun exportPoojaBookings(
             clipData = ClipData.newUri(context.contentResolver, title, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        context.startActivity(Intent.createChooser(intent, "Export Pooja Tokens"))
+        context.startActivity(Intent.createChooser(intent, "Export Puja Tokens"))
     }.onFailure {
         Toast.makeText(context, "Unable to export pooja tokens PDF", Toast.LENGTH_LONG).show()
     }
@@ -536,7 +610,7 @@ private fun createPoojaBookingsPdf(
 
     startPage()
 
-    drawWrapped("Pooja Token Bookings", titlePaint, extraBottom = 8f)
+    drawWrapped("Puja Token Bookings", titlePaint, extraBottom = 8f)
     drawWrapped(pooja.place, sectionPaint)
     drawWrapped("Scheduled: ${formatDateTime(pooja.scheduledAt)}", bodyPaint)
     drawWrapped("Status: ${pooja.status.toTitleLabel()}", bodyPaint)

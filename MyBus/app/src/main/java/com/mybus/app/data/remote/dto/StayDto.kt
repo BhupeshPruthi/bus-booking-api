@@ -95,7 +95,17 @@ data class StayDailyOccupancyReport(
 data class StayDailyOccupancyDay(
     @Json(name = "date") val date: String,
     @Json(name = "bookingCount") val bookingCount: Int,
+    @Json(name = "totalEarnings") val totalEarnings: Double = 0.0,
     @Json(name = "unitTypes") val unitTypes: List<StayDailyOccupancyUnit>
+)
+
+@JsonClass(generateAdapter = true)
+data class StayDailyOccupancyBookings(
+    @Json(name = "date") val date: String,
+    @Json(name = "bookingCount") val bookingCount: Int,
+    @Json(name = "totalEarnings") val totalEarnings: Double = 0.0,
+    @Json(name = "unitTypes") val unitTypes: List<StayDailyOccupancyUnit>,
+    @Json(name = "bookings") val bookings: List<StayBooking>
 )
 
 @JsonClass(generateAdapter = true)
@@ -130,6 +140,8 @@ data class StayBooking(
     @Json(name = "confirmedAt") val confirmedAt: String? = null,
     @Json(name = "completedAt") val completedAt: String? = null,
     @Json(name = "createdAt") val createdAt: String? = null,
+    @Json(name = "totalAccommodationUnits") val totalAccommodationUnits: Int? = null,
+    @Json(name = "dailyEarningsContribution") val dailyEarningsContribution: Double? = null,
     @Json(name = "items") val items: List<StayBookingItem> = emptyList(),
     @Json(name = "cancellation") val cancellation: StayCancellation? = null
 )

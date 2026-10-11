@@ -16,7 +16,8 @@ import javax.inject.Inject
 class TokenAuthenticator @Inject constructor(
     private val tokenManager: TokenManager,
     private val moshi: Moshi,
-    private val apiBaseUrlHolder: ApiBaseUrlHolder
+    private val apiBaseUrlHolder: ApiBaseUrlHolder,
+    private val dns: Dns
 ) : Authenticator {
 
     override fun authenticate(route: Route?, response: Response): Request? {
@@ -55,7 +56,7 @@ class TokenAuthenticator @Inject constructor(
                 .post(body)
                 .build()
 
-            val client = OkHttpClient.Builder().build()
+            val client = OkHttpClient.Builder().dns(dns).build()
 
             client.newCall(request).execute().use { response ->
                 if (response.isSuccessful) {

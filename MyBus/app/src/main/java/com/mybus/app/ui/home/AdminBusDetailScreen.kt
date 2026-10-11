@@ -318,6 +318,15 @@ private fun BusSummaryCard(bus: BusDetailData, bookings: List<BookingData>) {
                 Icons.Filled.CurrencyRupee, "Price",
                 "\u20B9${bus.price.toLong()} per seat"
             )
+            val confirmedAmount = bookings
+                .asSequence()
+                .filter { it.status == "confirmed" }
+                .sumOf { it.totalAmount }
+            SummaryRow(
+                Icons.Filled.CurrencyRupee,
+                "Total amount",
+                "\u20B9${confirmedAmount.toLong()}"
+            )
             bus.contactName?.let {
                 SummaryRow(Icons.Filled.Person, "Contact", "$it${bus.contactPhone?.let { p -> " ($p)" } ?: ""}")
             }
