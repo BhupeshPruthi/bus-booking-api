@@ -351,6 +351,58 @@ const paymentActionSchema = Joi.object({
   }),
 });
 
+// ============ HANUMAN CHALISA SCHEMAS ============
+
+const chalisaParticipantSchema = Joi.object({
+  displayName: Joi.string().trim().min(2).max(40).required(),
+});
+
+const chalisaReadingSchema = Joi.object({
+  clientRequestId: Joi.string().uuid().required(),
+  startingCount: Joi.number().integer().min(1).max(5000),
+});
+
+const chalisaReadingParamsSchema = Joi.object({
+  clientRequestId: Joi.string().uuid().required(),
+});
+
+const chalisaMyStatsQuerySchema = Joi.object({
+  month: Joi.string().pattern(/^\d{4}-(0[1-9]|1[0-2])$/).messages({
+    'string.pattern.base': 'month must be in YYYY-MM format',
+  }),
+});
+
+const chalisaBoardQuerySchema = Joi.object({
+  limit: Joi.number().integer().min(1).max(200).default(100),
+  offset: Joi.number().integer().min(0).default(0),
+});
+
+const chalisaArchiveQuerySchema = Joi.object({
+  limit: Joi.number().integer().min(1).max(50).default(20),
+});
+
+const chalisaMarathonParamsSchema = Joi.object({
+  id: Joi.string().uuid().required(),
+});
+
+const chalisaScheduleMarathonSchema = Joi.object({
+  title: Joi.string().trim().min(2).max(120).required(),
+  startsAt: Joi.date().iso(),
+  goal: Joi.number().integer().min(1).max(1000000000).allow(null),
+});
+
+const chalisaUpdateMarathonSchema = Joi.object({
+  title: Joi.string().trim().min(2).max(120),
+  startsAt: Joi.date().iso(),
+  goal: Joi.number().integer().min(1).max(1000000000).allow(null),
+}).min(1);
+
+const chalisaEndMarathonSchema = Joi.object({
+  confirmText: Joi.string().valid('END').required().messages({
+    'any.only': 'Type END to confirm',
+  }),
+});
+
 module.exports = {
   // Common
   uuidSchema,
@@ -364,6 +416,18 @@ module.exports = {
   // Feedback
   createFeedbackSchema,
   feedbackListSchema,
+
+  // Hanuman Chalisa
+  chalisaParticipantSchema,
+  chalisaReadingSchema,
+  chalisaReadingParamsSchema,
+  chalisaMyStatsQuerySchema,
+  chalisaBoardQuerySchema,
+  chalisaArchiveQuerySchema,
+  chalisaMarathonParamsSchema,
+  chalisaScheduleMarathonSchema,
+  chalisaUpdateMarathonSchema,
+  chalisaEndMarathonSchema,
 
   // Profile
   updateProfileSchema,

@@ -66,7 +66,19 @@
     { "method": "POST", "path": "/api/admin/stay/bookings/:id/confirm", "auth": "bearer+stayAdmin", "group": "stay-admin" },
     { "method": "POST", "path": "/api/admin/stay/bookings/:id/reject", "auth": "bearer+stayAdmin", "group": "stay-admin" },
     { "method": "GET", "path": "/api/admin/stay/cancellation-requests", "auth": "bearer+stayAdmin", "group": "stay-admin" },
-    { "method": "POST", "path": "/api/admin/stay/cancellation-requests/:id/decision", "auth": "bearer+stayAdmin", "group": "stay-admin" }
+    { "method": "POST", "path": "/api/admin/stay/cancellation-requests/:id/decision", "auth": "bearer+stayAdmin", "group": "stay-admin" },
+    { "method": "PUT", "path": "/api/chalisa/participant", "auth": "bearer|chalisaGuest", "group": "chalisa" },
+    { "method": "POST", "path": "/api/chalisa/readings", "auth": "bearer|chalisaGuest", "group": "chalisa" },
+    { "method": "DELETE", "path": "/api/chalisa/readings/:clientRequestId", "auth": "bearer|chalisaGuest", "group": "chalisa" },
+    { "method": "GET", "path": "/api/chalisa/me", "auth": "bearer|chalisaGuest", "group": "chalisa" },
+    { "method": "GET", "path": "/api/chalisa/marathon", "auth": "none", "group": "chalisa" },
+    { "method": "GET", "path": "/api/chalisa/summary", "auth": "none", "group": "chalisa" },
+    { "method": "GET", "path": "/api/chalisa/marathons/archive", "auth": "none", "group": "chalisa" },
+    { "method": "POST", "path": "/api/admin/chalisa/marathons", "auth": "bearer+superAdmin", "group": "chalisa-admin" },
+    { "method": "PATCH", "path": "/api/admin/chalisa/marathons/:id", "auth": "bearer+superAdmin", "group": "chalisa-admin" },
+    { "method": "DELETE", "path": "/api/admin/chalisa/marathons/:id", "auth": "bearer+superAdmin", "group": "chalisa-admin" },
+    { "method": "POST", "path": "/api/admin/chalisa/marathons/:id/end", "auth": "bearer+superAdmin", "group": "chalisa-admin" },
+    { "method": "POST", "path": "/api/admin/chalisa/marathons/:id/restore", "auth": "bearer+superAdmin", "group": "chalisa-admin" }
   ],
   "myBusAndroidRetrofit": {
     "source": "MyBus/app/src/main/java/com/mybus/app/data/remote/ApiService.kt",

@@ -78,6 +78,8 @@ class AuthService {
     const deletedEmail = `deleted+${userId}@invalid.balajisevak`;
     await db.transaction(async (trx) => {
       await trx('refresh_tokens').where('user_id', userId).del();
+      // Removes their Hanuman Chalisa readings and board entries too (cascade).
+      await trx('chalisa_participants').where('user_id', userId).del();
       await trx('users').where('id', userId).update({ name: 'Deleted User', email: deletedEmail, mobile: null, google_sub: null, apple_sub: null, deleted_at: trx.fn.now(), updated_at: trx.fn.now() });
     });
   }

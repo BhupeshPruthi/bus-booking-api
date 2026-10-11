@@ -57,6 +57,11 @@ const eventAdminOrSuperUser = requireCapability(
   'Access denied. Bus Admin or Super Admin required.'
 );
 
+const chalisaSuperAdmin = requireCapability(
+  CAPABILITIES.CHALISA_MANAGE,
+  'Access denied. Only a Super Admin can start a new Hanuman Chalisa marathon.'
+);
+
 const anyAdminOrSuperUser = async (req, res, next) => {
   if (!req.user) {
     return next(new UnauthorizedError('User not authenticated'));
@@ -85,6 +90,7 @@ module.exports = {
   poojaAdminOrSuperUser,
   stayAdminOrSuperUser,
   eventAdminOrSuperUser,
+  chalisaSuperAdmin,
   anyAdminOrSuperUser,
   adminOrSuperUser,
 };
