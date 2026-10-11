@@ -70,9 +70,29 @@ test('identity: guests are recognised from their pass, and a bad pass is rejecte
   const bad = run(chalisaIdentity(), { 'x-chalisa-guest': 'forged' });
   assert.equal(bad.error.code, 'INVALID_GUEST_TOKEN');
 
-  const lenient = run(chalisaIdentity({ allowInvalidGuest: true }), { 'x-chalisa-guest': 'forged' });
+  const lenient = run(chalisaIdentity({ lenient: true }), { 'x-chalisa-guest': 'forged' });
   assert.equal(lenient.error, undefined);
   assert.deepEqual(lenient.req.chalisaIdentity, {});
+});
+
+test('identity: public reads ignore a broken sign-in token but still ask for an expired one to refresh', () => {
+  const broken = run(chalisaIdentity({ lenient: true }), { authorization: 'Bearer not-a-jwt' });
+  assert.equal(broken.error, undefined);
+  assert.deepEqual(broken.req.chalisaIdentity, {});
+
+  const strict = run(chalisaIdentity(), { authorization: 'Bearer not-a-jwt' });
+  assert.equal(strict.error.code, 'INVALID_TOKEN');
+
+  const expired = jwt.sign({ id: 'user-1' }, config.jwt.secret, { expiresIn: -10 });
+  const lenientExpired = run(chalisaIdentity({ lenient: true }), { authorization: `Bearer ${expired}` });
+  assert.equal(lenientExpired.error.code, 'TOKEN_EXPIRED');
+});
+
+test('schedule start times must include a time zone', () => {
+  const { chalisaScheduleMarathonSchema } = require('../src/validators/schemas');
+  assert.ok(chalisaScheduleMarathonSchema.validate({ title: 'Diwali', startsAt: '2026-10-12T06:00' }).error);
+  assert.equal(chalisaScheduleMarathonSchema.validate({ title: 'Diwali', startsAt: '2026-10-12T06:00:00+05:30' }).error, undefined);
+  assert.equal(chalisaScheduleMarathonSchema.validate({ title: 'Diwali', startsAt: '2026-10-12T00:30:00.000Z' }).error, undefined);
 });
 
 test('a guest pass can never be used as a sign-in token', () => {

@@ -9,9 +9,10 @@ const GUEST_HEADER = 'x-chalisa-guest';
  * Works out who is counting: a signed-in user (Bearer token) or a guest (X-Chalisa-Guest).
  * Unlike optionalAuth, an expired sign-in token is rejected with TOKEN_EXPIRED so the app
  * refreshes it, instead of quietly treating the user as a new guest.
+ * With lenient (public reads), an invalid token or guest pass is ignored instead of rejected.
  * Sets req.chalisaIdentity to { userId } | { guestParticipantId } | {}.
  */
-const chalisaIdentity = ({ allowInvalidGuest = false } = {}) => (req, res, next) => {
+const chalisaIdentity = ({ lenient = false } = {}) => (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -24,6 +25,11 @@ const chalisaIdentity = ({ allowInvalidGuest = false } = {}) => (req, res, next)
         if (error.name === 'TokenExpiredError') {
           return next(new UnauthorizedError('Token expired', 'TOKEN_EXPIRED'));
         }
+        // Public reads still work with a broken sign-in token; the caller is just anonymous.
+        if (lenient) {
+          req.chalisaIdentity = {};
+          return next();
+        }
         return next(new UnauthorizedError('Invalid token', 'INVALID_TOKEN'));
       }
     }
@@ -33,7 +39,7 @@ const chalisaIdentity = ({ allowInvalidGuest = false } = {}) => (req, res, next)
       try {
         req.chalisaIdentity = { guestParticipantId: verifyGuestToken(guestToken) };
       } catch (error) {
-        if (!allowInvalidGuest) return next(error);
+        if (!lenient) return next(error);
         req.chalisaIdentity = {};
       }
       return next();

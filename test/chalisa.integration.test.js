@@ -148,6 +148,19 @@ test('Hanuman Chalisa marathon lifecycle and counting rules', { skip: !hasTestDa
     assert.equal(board.total, 22);
   });
 
+  await t.test('an undone tap that is retried later is not counted again', async () => {
+    const meera = await db('chalisa_participants').where('id', meeraId.guestParticipantId).first();
+    await allowNextRound(meera.id);
+    const tap = randomUUID();
+    const before = (await chalisa.getMarathonBoard({})).total;
+    await chalisa.recordReading(meeraId, tap);
+    await chalisa.undoReading(meeraId, tap);
+    const retry = await chalisa.recordReading(meeraId, tap);
+    assert.equal(retry.duplicate, true);
+    assert.equal((await chalisa.getMarathonBoard({})).total, before);
+    await expectCode(chalisa.recordReading(bhupeshId, tap), 'VALIDATION_ERROR');
+  });
+
   await t.test('personal stats include lifetime and each marathon', async () => {
     const me = await chalisa.getMyStats(bhupeshId);
     assert.equal(me.lifetime, 20);
@@ -163,6 +176,7 @@ test('Hanuman Chalisa marathon lifecycle and counting rules', { skip: !hasTestDa
     await expectCode(chalisa.endMarathon(admin.id, marathon.id, { confirmText: 'end' }), 'VALIDATION_ERROR');
     const { archived } = await chalisa.endMarathon(admin.id, marathon.id, { confirmText: 'END' });
     assert.equal(archived.finalTotal, 22);
+    assert.equal('endedBy' in archived, false, 'the super admin name must not be in responses');
     assert.equal(archived.finalParticipantCount, 2);
 
     const summary = await chalisa.getSummary({});
@@ -174,7 +188,10 @@ test('Hanuman Chalisa marathon lifecycle and counting rules', { skip: !hasTestDa
     const me = await chalisa.getMyStats(bhupeshId);
     assert.equal(me.lifetime, 20);
     assert.equal(me.marathons[0].state, 'ended');
-    assert.equal((await chalisa.listArchivedMarathons()).length, 1);
+    const archive = await chalisa.listArchivedMarathons();
+    assert.equal(archive.length, 1);
+    assert.equal('endedBy' in archive[0], false);
+    assert.equal('endedBy' in (await chalisa.getSummary({})).lastEnded, false);
   });
 
   await t.test('ending can be undone within 10 minutes only', async () => {
@@ -187,21 +204,52 @@ test('Hanuman Chalisa marathon lifecycle and counting rules', { skip: !hasTestDa
     await expectCode(chalisa.restoreMarathon(marathon.id, db, elevenMinutesLater), 'RESTORE_EXPIRED');
   });
 
+  await t.test('restoring while another marathon is scheduled is refused cleanly', async () => {
+    const ended = await chalisa.scheduleMarathon(admin.id, { title: 'Short marathon' });
+    await chalisa.endMarathon(admin.id, ended.marathon.id, { confirmText: 'END' });
+    const { marathon: blocker } = await chalisa.scheduleMarathon(admin.id, { title: 'Blocker', startsAt: inTwoDays });
+    await expectCode(chalisa.restoreMarathon(ended.marathon.id), 'MARATHON_ALREADY_ACTIVE');
+    await chalisa.cancelMarathon(blocker.id);
+  });
+
   await t.test('a scheduled marathon can be cancelled and disappears without archiving', async () => {
     const { marathon: next } = await chalisa.scheduleMarathon(admin.id, { title: 'Diwali marathon', startsAt: inTwoDays });
     await chalisa.cancelMarathon(next.id);
     assert.equal((await chalisa.getSummary({})).state, 'none');
-    assert.equal((await chalisa.listArchivedMarathons()).length, 1);
+    assert.equal((await chalisa.listArchivedMarathons()).length, 2);
     await expectCode(chalisa.restoreMarathon(next.id), 'NOT_FOUND');
   });
 
-  await t.test('deleting an account removes that person\'s readings', async () => {
+  await t.test('deleting an account removes that person\'s readings, and their old token cannot bring them back', async () => {
     const authService = require('../src/services/authService');
     await authService.deleteAccount(bhupesh.id);
     assert.equal(await db('chalisa_participants').where('user_id', bhupesh.id).first(), undefined);
     const me = await chalisa.getMyStats(bhupeshId);
     assert.equal(me.lifetime, 0);
     const archived = await chalisa.listArchivedMarathons();
-    assert.equal(archived[0].finalTotal, 22);
+    assert.equal(archived.find((m) => m.id === marathon.id).finalTotal, 22);
+
+    // A still-valid access token after deletion must not recreate data.
+    const { marathon: again } = await chalisa.scheduleMarathon(admin.id, { title: 'After deletion' });
+    await expectCode(chalisa.recordReading(bhupeshId, randomUUID()), 'SESSION_USER_NOT_FOUND');
+    await expectCode(chalisa.saveParticipant(bhupeshId, 'Ghost'), 'SESSION_USER_NOT_FOUND');
+    assert.equal(await db('chalisa_participants').where('user_id', bhupesh.id).first(), undefined);
+    await chalisa.endMarathon(admin.id, again.id, { confirmText: 'END' });
+  });
+
+  await t.test('a tap racing with End is either counted in the final total or refused', async () => {
+    const { marathon: race } = await chalisa.scheduleMarathon(admin.id, { title: 'Race marathon' });
+    const runner = await chalisa.saveParticipant({}, 'Runner');
+    const runnerId = { guestParticipantId: chalisa.verifyGuestToken(runner.guestToken) };
+    const results = await Promise.allSettled([
+      chalisa.recordReading(runnerId, randomUUID()),
+      chalisa.endMarathon(admin.id, race.id, { confirmText: 'END' }),
+    ]);
+    const tap = results[0];
+    assert.equal(results[1].status, 'fulfilled');
+    const archivedRace = (await chalisa.listArchivedMarathons()).find((m) => m.id === race.id);
+    const counted = await db('chalisa_readings').where('marathon_id', race.id).sum('count as total').first();
+    assert.equal(archivedRace.finalTotal, Number(counted.total || 0), 'archive must match the readings');
+    if (tap.status === 'rejected') assert.equal(tap.reason.code, 'MARATHON_NOT_RUNNING');
   });
 });

@@ -87,7 +87,7 @@ router.get(
  */
 router.get(
   '/marathon',
-  chalisaIdentity({ allowInvalidGuest: true }),
+  chalisaIdentity({ lenient: true }),
   validate(chalisaBoardQuerySchema, 'query'),
   chalisaController.getMarathonBoard
 );
@@ -99,7 +99,7 @@ router.get(
  */
 router.get(
   '/summary',
-  chalisaIdentity({ allowInvalidGuest: true }),
+  chalisaIdentity({ lenient: true }),
   chalisaController.getSummary
 );
 

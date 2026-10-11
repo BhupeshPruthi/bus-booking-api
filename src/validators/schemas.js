@@ -385,15 +385,24 @@ const chalisaMarathonParamsSchema = Joi.object({
   id: Joi.string().uuid().required(),
 });
 
+// Start times must say their time zone ("Z" or "+05:30"), so they're never read as UTC by mistake.
+// (Joi's isoDate() would first convert a zone-less time using the server's own zone.)
+const chalisaStartsAt = Joi.string()
+  .pattern(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})$/)
+  .custom((value, helpers) => (Number.isNaN(Date.parse(value)) ? helpers.error('string.pattern.base') : value))
+  .messages({
+    'string.pattern.base': 'startsAt must be a date and time with a time zone, for example 2026-10-12T06:00:00+05:30',
+  });
+
 const chalisaScheduleMarathonSchema = Joi.object({
   title: Joi.string().trim().min(2).max(120).required(),
-  startsAt: Joi.date().iso(),
+  startsAt: chalisaStartsAt,
   goal: Joi.number().integer().min(1).max(1000000000).allow(null),
 });
 
 const chalisaUpdateMarathonSchema = Joi.object({
   title: Joi.string().trim().min(2).max(120),
-  startsAt: Joi.date().iso(),
+  startsAt: chalisaStartsAt,
   goal: Joi.number().integer().min(1).max(1000000000).allow(null),
 }).min(1);
 

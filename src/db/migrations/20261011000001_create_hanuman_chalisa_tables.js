@@ -8,6 +8,7 @@
  * - chalisa_readings: permanent log of every reading (tapped rounds plus one optional
  *   starting count per marathon). Never cleared when a marathon ends.
  * - chalisa_marathon_totals: running total per participant per marathon, for the board.
+ * - chalisa_undone_requests: ids of undone taps, so a late retry of one is never re-counted.
  *
  * @param { import("knex").Knex } knex
  */
@@ -48,8 +49,9 @@ exports.up = async function (knex) {
     table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
     table.uuid('participant_id').notNullable()
       .references('id').inTable('chalisa_participants').onDelete('CASCADE');
+    // RESTRICT: marathons are archived, never deleted, and deleting one must not erase lifetime counts.
     table.uuid('marathon_id').notNullable()
-      .references('id').inTable('chalisa_marathons').onDelete('CASCADE');
+      .references('id').inTable('chalisa_marathons').onDelete('RESTRICT');
     // 'round' = one tapped reading (count 1). 'opening' = readings done before joining,
     // entered once per marathon as a starting count.
     table.string('kind', 10).notNullable().defaultTo('round');
@@ -82,12 +84,20 @@ exports.up = async function (knex) {
   await knex.raw(
     'CREATE INDEX chalisa_marathon_totals_board ON chalisa_marathon_totals (marathon_id, total DESC, last_read_at ASC)'
   );
+
+  await knex.schema.createTable('chalisa_undone_requests', (table) => {
+    table.uuid('client_request_id').primary();
+    table.uuid('participant_id').notNullable()
+      .references('id').inTable('chalisa_participants').onDelete('CASCADE');
+    table.timestamp('created_at', { useTz: true }).notNullable().defaultTo(knex.fn.now());
+  });
 };
 
 /**
  * @param { import("knex").Knex } knex
  */
 exports.down = async function (knex) {
+  await knex.schema.dropTableIfExists('chalisa_undone_requests');
   await knex.schema.dropTableIfExists('chalisa_marathon_totals');
   await knex.schema.dropTableIfExists('chalisa_readings');
   await knex.schema.dropTableIfExists('chalisa_participants');

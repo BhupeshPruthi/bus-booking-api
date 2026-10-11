@@ -150,9 +150,8 @@ async function resolveParticipant(identity, database, { create = false, forUpdat
     const existing = await lock(database('chalisa_participants').where('user_id', identity.userId)).first();
     if (existing || !create) return existing || null;
 
-    // Deleted accounts lose their sessions, so a valid token always belongs to a live user.
-    const user = await database('users').where('id', identity.userId).first('id', 'name');
-    if (!user) throw new UnauthorizedError('Please sign in again.', 'SESSION_USER_NOT_FOUND');
+    // An access token can outlive account deletion by a few minutes; never recreate data then.
+    const user = await activeUser(database, identity.userId);
     const displayName = normalizeText(user.name).slice(0, 60);
     if (displayName.length < 2) throw nameRequiredError();
 
@@ -175,10 +174,22 @@ async function resolveParticipant(identity, database, { create = false, forUpdat
   return null;
 }
 
-/** The scheduled or running marathon, if any. */
-async function currentMarathon(database, { forUpdate = false } = {}) {
+async function activeUser(database, userId) {
+  const user = await database('users').where('id', userId).whereNull('deleted_at').first('id', 'name');
+  if (!user) throw new UnauthorizedError('Please sign in again.', 'SESSION_USER_NOT_FOUND');
+  return user;
+}
+
+/**
+ * The scheduled or running marathon, if any. Counting reads it FOR SHARE: taps don't block
+ * each other, but ending the marathon (FOR UPDATE) waits for taps in flight, and a tap that
+ * waited on an end sees the marathon as ended.
+ */
+async function currentMarathon(database, { forUpdate = false, forShare = false } = {}) {
   const query = database('chalisa_marathons').whereNull('ended_at').whereNull('cancelled_at');
-  return (forUpdate ? query.forUpdate() : query).first();
+  if (forUpdate) return query.forUpdate().first();
+  if (forShare) return query.forShare().first();
+  return query.first();
 }
 
 async function marathonTotals(database, marathonId) {
@@ -259,6 +270,7 @@ async function saveParticipant(identity, rawName, database = db) {
   }
 
   if (identity?.userId) {
+    await activeUser(database, identity.userId);
     await database('chalisa_participants')
       .insert({ user_id: identity.userId, display_name: displayName })
       .onConflict('user_id')
@@ -315,6 +327,13 @@ async function recordReading(identity, clientRequestId, { startingCount } = {}, 
     // Locking the participant serialises their taps, starting count and retries.
     const participant = await resolveParticipant(identity, trx, { create: true, forUpdate: true });
 
+    // A tap that was undone and is then retried (e.g. a delayed resend) must not count again.
+    const undone = await trx('chalisa_undone_requests').where('client_request_id', clientRequestId).first();
+    if (undone) {
+      if (undone.participant_id !== participant.id) throw new ValidationError('clientRequestId is already used');
+      return { reading: null, ...(await countsFor(participant, await currentMarathon(trx), trx)), duplicate: true };
+    }
+
     const existing = await trx('chalisa_readings').where('client_request_id', clientRequestId).first();
     if (existing) {
       if (existing.participant_id !== participant.id) {
@@ -328,7 +347,7 @@ async function recordReading(identity, clientRequestId, { startingCount } = {}, 
       };
     }
 
-    const marathon = await currentMarathon(trx);
+    const marathon = await currentMarathon(trx, { forShare: true });
     const now = new Date();
     requireRunning(marathon, now);
 
@@ -400,13 +419,14 @@ async function undoReading(identity, clientRequestId, database = db) {
       .first();
     if (!reading) throw new NotFoundError('Reading');
 
-    const marathon = await trx('chalisa_marathons').where('id', reading.marathon_id).first();
+    const marathon = await trx('chalisa_marathons').where('id', reading.marathon_id).forShare().first();
     const tooOld = (Date.now() - new Date(reading.read_at).getTime()) / 1000 > UNDO_WINDOW_SECONDS;
     if (tooOld || marathonState(marathon) !== 'running') {
       throw appError('This round can no longer be undone.', 400, 'UNDO_EXPIRED');
     }
 
     await trx('chalisa_readings').where('id', reading.id).del();
+    await trx('chalisa_undone_requests').insert({ client_request_id: reading.client_request_id, participant_id: participant.id });
     await trx('chalisa_marathon_totals')
       .where({ marathon_id: reading.marathon_id, participant_id: participant.id })
       .decrement('total', reading.count);
@@ -543,7 +563,11 @@ async function getMarathonBoard(identity, filters = {}, database = db, now = new
           )
           .as('ranked')
       )
-      .orderBy([{ column: 'total', order: 'desc' }, { column: 'last_read_at', order: 'asc' }])
+      .orderBy([
+        { column: 'total', order: 'desc' },
+        { column: 'last_read_at', order: 'asc' },
+        { column: 'participant_id', order: 'asc' },
+      ])
       .limit(limit)
       .offset(offset),
     optionalParticipant(identity, database),
@@ -581,16 +605,13 @@ function formatArchived(row) {
     ...formatMarathon(row),
     finalTotal: toCount(row.final_total),
     finalParticipantCount: toCount(row.final_participant_count),
-    endedBy: row.ended_by_name || null,
   };
 }
 
 async function lastEndedMarathon(database) {
-  const row = await database('chalisa_marathons as m')
-    .leftJoin('users as u', 'u.id', 'm.ended_by')
-    .whereNotNull('m.ended_at')
-    .select('m.*', 'u.name as ended_by_name')
-    .orderBy('m.ended_at', 'desc')
+  const row = await database('chalisa_marathons')
+    .whereNotNull('ended_at')
+    .orderBy('ended_at', 'desc')
     .first();
   return row ? formatArchived(row) : null;
 }
@@ -630,11 +651,9 @@ async function getSummary(identity, database = db, now = new Date()) {
 /** Past marathons, newest first, with the totals they ended on. */
 async function listArchivedMarathons(filters = {}, database = db) {
   const limit = Math.min(50, Math.max(1, Number(filters.limit) || 20));
-  const rows = await database('chalisa_marathons as m')
-    .leftJoin('users as u', 'u.id', 'm.ended_by')
-    .whereNotNull('m.ended_at')
-    .select('m.*', 'u.name as ended_by_name')
-    .orderBy('m.ended_at', 'desc')
+  const rows = await database('chalisa_marathons')
+    .whereNotNull('ended_at')
+    .orderBy('ended_at', 'desc')
     .limit(limit);
   return rows.map(formatArchived);
 }
@@ -749,10 +768,9 @@ async function endMarathon(adminUserId, id, { confirmText } = {}, database = db,
         updated_at: trx.fn.now(),
       })
       .returning('*');
-    const admin = await trx('users').where('id', adminUserId).first('name');
     return {
       archived: {
-        ...formatArchived({ ...ended, ended_by_name: admin?.name }),
+        ...formatArchived(ended),
         restoreUntil: addSeconds(ended.ended_at, RESTORE_WINDOW_SECONDS),
       },
     };
@@ -769,17 +787,22 @@ async function restoreMarathon(id, database = db, now = new Date()) {
     }
     if (await currentMarathon(trx, { forUpdate: true })) throw alreadyActiveError();
 
-    const [restored] = await trx('chalisa_marathons')
-      .where('id', id)
-      .update({
-        ended_at: null,
-        ended_by: null,
-        final_total: null,
-        final_participant_count: null,
-        updated_at: trx.fn.now(),
-      })
-      .returning('*');
-    return { marathon: formatMarathon(restored, now) };
+    try {
+      const [restored] = await trx('chalisa_marathons')
+        .where('id', id)
+        .update({
+          ended_at: null,
+          ended_by: null,
+          final_total: null,
+          final_participant_count: null,
+          updated_at: trx.fn.now(),
+        })
+        .returning('*');
+      return { marathon: formatMarathon(restored, now) };
+    } catch (error) {
+      if (error.code === '23505') throw alreadyActiveError();
+      throw error;
+    }
   });
 }
 
