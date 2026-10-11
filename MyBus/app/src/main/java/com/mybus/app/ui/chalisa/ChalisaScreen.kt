@@ -1,6 +1,7 @@
 package com.mybus.app.ui.chalisa
 
 import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -24,6 +25,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -32,8 +34,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
@@ -59,6 +63,8 @@ fun ChalisaScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val lifecycleOwner = LocalLifecycleOwner.current
 
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.onResume() }
+
     // Board refresh every 30 seconds, only while the screen is visible.
     LaunchedEffect(lifecycleOwner) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -80,6 +86,25 @@ fun ChalisaScreen(
     val phase = state.phase(now)
     LaunchedEffect(state.marathon?.state, phase) {
         if (state.marathon?.state == "scheduled" && phase == MarathonPhase.RUNNING) viewModel.refresh()
+    }
+
+    // The lock-screen counter is on by default: once the reader has joined a running marathon it
+    // appears on the lock screen. Android 13+ asks for notification permission first; refusing
+    // turns it off.
+    val context = LocalContext.current
+    val lockScreenPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) viewModel.showLockScreenCounterIfOn() else viewModel.onNotificationPermissionDenied()
+    }
+    val countingOpen = phase == MarathonPhase.RUNNING && state.isJoined
+    LaunchedEffect(countingOpen, state.lockScreenOn) {
+        if (!countingOpen || !state.lockScreenOn) return@LaunchedEffect
+        val needsPermission = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        if (needsPermission) {
+            lockScreenPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            viewModel.showLockScreenCounterIfOn()
+        }
     }
 
     LaunchedEffect(viewModel) {

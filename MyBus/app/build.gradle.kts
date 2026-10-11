@@ -85,6 +85,8 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // java.time (dates, India time zone) on Android 7 (API 24/25), which lacks it.
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -131,6 +133,7 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
     implementation("com.squareup.okhttp3:okhttp-dnsoverhttps:4.12.0")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
     implementation("io.coil-kt:coil-compose:2.7.0")
 
     // Moshi

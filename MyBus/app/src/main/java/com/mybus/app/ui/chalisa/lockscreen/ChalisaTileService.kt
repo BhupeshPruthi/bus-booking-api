@@ -11,6 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 
 /** Quick Settings tile "Chalisa +1": swipe down, even on the lock screen, and tap to count a round. */
@@ -42,8 +43,9 @@ class ChalisaTileService : TileService() {
         super.onClick()
         scope.launch {
             render(Tile.STATE_ACTIVE, "Counting…")
-            counter.countRound()
-            onStartListening()
+            val outcome = withTimeoutOrNull(ChalisaLockScreenCounter.BUTTON_TIMEOUT_MILLIS) { counter.countRound() }
+            // Shows what happened ("Round counted", "Too soon", no connection) on the tile itself.
+            render(Tile.STATE_ACTIVE, outcome ?: "Slow connection, tap again")
         }
     }
 

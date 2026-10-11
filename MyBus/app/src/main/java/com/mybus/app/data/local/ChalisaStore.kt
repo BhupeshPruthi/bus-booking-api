@@ -26,13 +26,15 @@ class ChalisaStore @Inject constructor(
 ) {
     companion object {
         private val GUEST_TOKEN = stringPreferencesKey("guest_token")
-        private val LOCK_SCREEN_COUNTER = booleanPreferencesKey("lock_screen_counter")
+        private val LOCK_SCREEN_COUNTER = booleanPreferencesKey("lock_screen_counter_on")
         private val LAST_TAP_ID = stringPreferencesKey("last_tap_id")
         private val LAST_TAP_UNDO_UNTIL = stringPreferencesKey("last_tap_undo_until")
+        private val PENDING_ROUND_ID = stringPreferencesKey("pending_round_id")
     }
 
     val guestToken: Flow<String?> = context.chalisaDataStore.data.map { it[GUEST_TOKEN] }
-    val lockScreenCounter: Flow<Boolean> = context.chalisaDataStore.data.map { it[LOCK_SCREEN_COUNTER] == true }
+    /** On by default; off only once the reader turns it off (or refuses notifications). */
+    val lockScreenCounter: Flow<Boolean> = context.chalisaDataStore.data.map { it[LOCK_SCREEN_COUNTER] ?: true }
 
     suspend fun currentGuestToken(): String? = guestToken.first()
 
@@ -49,6 +51,16 @@ class ChalisaStore @Inject constructor(
     }
 
     suspend fun isLockScreenCounterOn(): Boolean = lockScreenCounter.first()
+
+    /**
+     * Id of a +1 whose answer never arrived (timeout, lost connection). The server may have
+     * counted it, so the next +1 reuses this id and can't be counted twice.
+     */
+    suspend fun pendingRoundId(): String? = context.chalisaDataStore.data.first()[PENDING_ROUND_ID]
+
+    suspend fun setPendingRoundId(id: String?) {
+        context.chalisaDataStore.edit { if (id == null) it.remove(PENDING_ROUND_ID) else it[PENDING_ROUND_ID] = id }
+    }
 
     /** The latest tap, so the lock-screen Undo knows what to remove. */
     suspend fun saveLastTap(clientRequestId: String, undoUntil: String) {

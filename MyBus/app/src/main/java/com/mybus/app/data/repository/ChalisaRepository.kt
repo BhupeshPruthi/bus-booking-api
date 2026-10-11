@@ -91,11 +91,21 @@ class ChalisaRepository @Inject constructor(
             result.guestToken?.let { chalisaStore.saveGuestToken(it) }
         }.map { it.participant }
 
-    /** Counts one round. A new id per tap means a retried request is never counted twice. */
-    suspend fun addRound(clientRequestId: String = UUID.randomUUID().toString()) =
-        request("Couldn't count this round") {
+    /**
+     * Counts one round. Each tap gets a new id, except after a lost answer: then the server may
+     * already have counted it, so the id is reused until a definite answer arrives (the server
+     * treats a repeated id as the same round).
+     */
+    suspend fun addRound(): Result<ChalisaCounts> {
+        val clientRequestId = chalisaStore.pendingRoundId() ?: UUID.randomUUID().toString()
+        chalisaStore.setPendingRoundId(clientRequestId)
+        val result = request("Couldn't count this round") {
             apiService.addChalisaReading(ChalisaReadingRequest(clientRequestId))
         }
+        val answerLost = (result.exceptionOrNull() as? ChalisaException)?.code == ChalisaErrorCodes.NETWORK
+        if (!answerLost) chalisaStore.setPendingRoundId(null)
+        return result
+    }
 
     suspend fun addStartingCount(count: Int, clientRequestId: String = UUID.randomUUID().toString()) =
         request("Couldn't add your starting count") {

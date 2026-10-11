@@ -12,7 +12,8 @@ import java.util.Locale
 /** Marathon times and reading days follow India time, whatever the phone's own time zone. */
 val ChalisaZone: ZoneId = ZoneId.of("Asia/Kolkata")
 
-private val indianNumbers = NumberFormat.getIntegerInstance(Locale("en", "IN"))
+// NumberFormat isn't thread-safe, and the lock-screen counter formats off the main thread.
+private val indianNumbers = ThreadLocal.withInitial { NumberFormat.getIntegerInstance(Locale("en", "IN")) }
 private val dayFormatter = DateTimeFormatter.ofPattern("EEE, d MMM", Locale.ENGLISH)
 private val dateFormatter = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH)
 private val shortDateFormatter = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH)
@@ -20,8 +21,8 @@ private val timeFormatter = DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH
 private val monthFormatter = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ENGLISH)
 
 /** 124580 → "1,24,580" */
-fun formatCount(value: Long): String = indianNumbers.format(value)
-fun formatCount(value: Int): String = indianNumbers.format(value.toLong())
+fun formatCount(value: Long): String = indianNumbers.get()!!.format(value)
+fun formatCount(value: Int): String = formatCount(value.toLong())
 
 fun parseInstant(value: String?): Instant? = value?.let { runCatching { Instant.parse(it) }.getOrNull() }
 

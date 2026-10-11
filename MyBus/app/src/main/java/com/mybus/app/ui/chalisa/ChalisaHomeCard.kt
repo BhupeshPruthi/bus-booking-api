@@ -65,7 +65,12 @@ fun ChalisaHomeCard(
     val summary by viewModel.summary.collectAsStateWithLifecycle()
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refresh() }
 
-    val current = summary ?: return
+    val current = summary
+    if (current == null) {
+        // Couldn't load: the super admin still gets a way in (the screen shows its own error).
+        if (canManage) AdminScheduleCard(null, onOpen)
+        return
+    }
     val marathon = current.marathon
     when {
         marathon != null && current.state == "running" -> RunningCard(current, onOpen)
@@ -139,7 +144,7 @@ private fun ScheduledCard(summary: ChalisaSummary, onOpen: () -> Unit) {
 }
 
 @Composable
-private fun AdminScheduleCard(summary: ChalisaSummary, onSchedule: () -> Unit) {
+private fun AdminScheduleCard(summary: ChalisaSummary?, onSchedule: () -> Unit) {
     OutlinedCard(
         modifier = Modifier.fillMaxWidth(),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
@@ -151,16 +156,22 @@ private fun AdminScheduleCard(summary: ChalisaSummary, onSchedule: () -> Unit) {
                 Column(Modifier.weight(1f)) {
                     Text("Hanuman Chalisa marathon", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Text(
-                        "No marathon scheduled · only you can see this",
+                        if (summary == null) "Couldn't load · only you can see this" else "No marathon scheduled · only you can see this",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
             Button(onClick = onSchedule, modifier = Modifier.fillMaxWidth()) {
-                Text(if (summary.lastEnded != null) "Schedule the next marathon" else "Schedule a marathon")
+                Text(
+                    when {
+                        summary == null -> "Open Hanuman Chalisa"
+                        summary.lastEnded != null -> "Schedule the next marathon"
+                        else -> "Schedule a marathon"
+                    }
+                )
             }
-            summary.lastEnded?.let {
+            summary?.lastEnded?.let {
                 Text(
                     "Last: ${it.title} · ${formatCount(it.finalTotal)} readings",
                     style = MaterialTheme.typography.bodySmall,

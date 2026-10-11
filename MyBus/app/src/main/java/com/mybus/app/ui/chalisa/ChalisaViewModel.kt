@@ -49,7 +49,7 @@ data class ChalisaUiState(
     val endConfirmText: String = "",
     val isEnding: Boolean = false,
     val showCancelDialog: Boolean = false,
-    val lockScreenOn: Boolean = false,
+    val lockScreenOn: Boolean = true,
     /** The marathon this super admin just ended, while undo is still possible. */
     val recentlyEnded: ChalisaArchivedMarathon? = null
 ) {
@@ -113,6 +113,16 @@ class ChalisaViewModel @Inject constructor(
 
     private fun offsetFrom(serverTime: String?): Long? =
         parseInstant(serverTime)?.let { it.toEpochMilli() - System.currentTimeMillis() }
+
+    private var hasResumed = false
+
+    /**
+     * The screen came back into view, e.g. after scheduling or editing a marathon from it.
+     * The first resume is skipped because init already loads.
+     */
+    fun onResume() {
+        if (hasResumed) refresh() else hasResumed = true
+    }
 
     /** Loads the board and personal stats together. */
     fun refresh(showSpinner: Boolean = false) {
@@ -224,10 +234,14 @@ class ChalisaViewModel @Inject constructor(
                         repository.addStartingCount(startingCount)
                             .onSuccess { result ->
                                 _uiState.update { it.copy(startingCountText = "0", lastTap = result.reading) }
+                                lockScreenCounter.onCountsChanged(result)
+                                result.reading?.let {
+                                    send("Added ${formatCount(startingCount)} readings.", ChalisaAction.UndoRound(it.clientRequestId))
+                                }
                             }
                             .onFailure { handleFailure(it) }
                     }
-                    send("You're in as $name.")
+                    if (startingCount == 0) send("You're in as $name.")
                 }
                 .onFailure { handleFailure(it) }
             _uiState.update { it.copy(isJoining = false) }
@@ -298,7 +312,14 @@ class ChalisaViewModel @Inject constructor(
         }
     }
 
+    /** Shows the lock-screen counter if it's on (the default) and not already showing. */
+    fun showLockScreenCounterIfOn() {
+        viewModelScope.launch { lockScreenCounter.showIfOn() }
+    }
+
+    /** Without notifications there's no lock-screen counter, so the switch shows it as off. */
     fun onNotificationPermissionDenied() {
+        viewModelScope.launch { lockScreenCounter.stop() }
         send("Allow notifications for Balaji Sevak to count from the lock screen.")
     }
 

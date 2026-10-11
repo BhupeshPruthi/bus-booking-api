@@ -54,9 +54,16 @@ class ChalisaLockScreenCounter @Inject constructor(
         const val ACTION_COUNT = "com.mybus.app.chalisa.COUNT"
         const val ACTION_UNDO = "com.mybus.app.chalisa.UNDO"
         const val ACTION_STOP = "com.mybus.app.chalisa.STOP"
+
+        /** Lock-screen buttons must finish well inside Android's background broadcast limit. */
+        const val BUTTON_TIMEOUT_MILLIS = 9_000L
+        const val TIMED_OUT_NOTE = "The connection is very slow. This round may not have been counted. Tap +1 again; it won't count twice."
     }
 
     private val notifications = NotificationManagerCompat.from(context)
+
+    /** What the counter last showed, so a failed tap can add a note without more network calls. */
+    @Volatile private var lastContent: LockScreenContent? = null
 
     fun canPostNotifications(): Boolean =
         Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
@@ -74,6 +81,20 @@ class ChalisaLockScreenCounter @Inject constructor(
         notifications.cancel(NOTIFICATION_ID)
     }
 
+    /** The +1 counter (not the "ended" message) is on the lock screen right now. */
+    fun isCounterShowing(): Boolean =
+        context.getSystemService(NotificationManager::class.java).activeNotifications
+            .any { it.id == NOTIFICATION_ID && it.isOngoing }
+
+    /**
+     * Puts the counter on the lock screen while a marathon runs, unless the reader turned it off.
+     * Called when the Chalisa screen shows a running marathon the reader has joined.
+     */
+    suspend fun showIfOn() {
+        if (!store.isLockScreenCounterOn() || !canPostNotifications() || isCounterShowing()) return
+        refresh()
+    }
+
     /** Re-reads the numbers from the server and redraws the notification, if it's on. */
     suspend fun refresh(note: String? = null) {
         if (!store.isLockScreenCounterOn()) return
@@ -83,11 +104,11 @@ class ChalisaLockScreenCounter @Inject constructor(
             return
         }
         val me = repository.myStats().getOrNull()
-        val board = repository.board().getOrNull()
+        val marathonId = summary?.marathon?.id
         show(
             LockScreenContent(
                 today = me?.today ?: summary?.myToday ?: 0,
-                marathonCount = board?.me?.count ?: 0,
+                marathonCount = me?.marathons?.firstOrNull { it.id == marathonId }?.count ?: lastContent?.marathonCount ?: 0,
                 groupTotal = summary?.total ?: 0,
                 lastReadAt = me?.lastReadAt,
                 canUndo = canUndoLastTap(),
@@ -103,39 +124,65 @@ class ChalisaLockScreenCounter @Inject constructor(
         show(counts.toContent(canUndo = canUndoLastTap()))
     }
 
-    /** The +1 button. */
-    suspend fun countRound() {
+    /**
+     * The +1 button (notification or Quick Settings tile). Returns a short line for the tile.
+     * The notification is only drawn while the counter is on.
+     */
+    suspend fun countRound(): String {
+        var outcome = "Round counted"
         repository.addRound()
             .onSuccess { counts ->
                 counts.reading?.let { store.saveLastTap(it.clientRequestId, it.undoUntil) }
-                show(counts.toContent(canUndo = true, note = "Round counted"))
+                if (store.isLockScreenCounterOn()) show(counts.toContent(canUndo = true, note = outcome))
             }
-            .onFailure { handleFailure(it) }
+            .onFailure { outcome = handleFailure(it) }
+        return outcome
+    }
+
+    /** A button's work ran out of time (very slow network): say so without more calls. */
+    suspend fun onTimedOut() {
+        if (store.isLockScreenCounterOn()) showNote(TIMED_OUT_NOTE)
     }
 
     /** The Undo button: removes the latest tap if it's still within the undo time. */
     suspend fun undoLastTap() {
-        val (id, _) = store.lastTap() ?: return refresh("Nothing to undo")
+        val (id, _) = store.lastTap() ?: return showNote("Nothing to undo")
         repository.undo(id)
             .onSuccess { counts ->
                 store.clearLastTap()
                 show(counts.toContent(canUndo = false, note = "Removed"))
             }
             .onFailure {
-                store.clearLastTap()
-                handleFailure(it)
+                if ((it as? ChalisaException)?.code == ChalisaErrorCodes.NETWORK) {
+                    // Keep the tap so Undo can be tried again.
+                    showNote("No connection, so nothing was removed. Tap Undo again.")
+                } else {
+                    store.clearLastTap()
+                    handleFailure(it)
+                }
             }
     }
 
-    private suspend fun handleFailure(error: Throwable) {
-        when ((error as? ChalisaException)?.code) {
-            ChalisaErrorCodes.MARATHON_NOT_RUNNING -> showEnded(null)
-            ChalisaErrorCodes.MARATHON_NOT_STARTED -> showEnded("Counting opens when the marathon starts.")
+    /** Shows what went wrong and returns it as a short line for the tile. */
+    private suspend fun handleFailure(error: Throwable): String {
+        val note = when ((error as? ChalisaException)?.code) {
+            ChalisaErrorCodes.MARATHON_NOT_RUNNING -> return "No marathon".also { showEnded(null) }
+            ChalisaErrorCodes.MARATHON_NOT_STARTED -> "Counting opens when the marathon starts."
+                .also { showEnded(it); return "Not started" }
             ChalisaErrorCodes.NAME_REQUIRED, ChalisaErrorCodes.INVALID_GUEST_TOKEN ->
-                refresh("Open the app and enter your name to count")
-            ChalisaErrorCodes.NETWORK -> refresh("No connection. This round wasn't counted, so tap +1 again.")
-            else -> refresh(error.message)
+                "Open the app and enter your name to count"
+            // The server may have counted it; the next +1 reuses the same id, so it can't count twice.
+            ChalisaErrorCodes.NETWORK -> "No connection. This round may not have been counted. Tap +1 again; it won't count twice."
+            else -> error.message ?: "Couldn't count this round. Please try again."
         }
+        if (store.isLockScreenCounterOn()) showNote(note)
+        return note
+    }
+
+    /** Adds a note to what's showing, using the last numbers instead of reloading them. */
+    private suspend fun showNote(note: String) {
+        val current = lastContent
+        if (current != null) show(current.copy(note = note, canUndo = canUndoLastTap())) else refresh(note)
     }
 
     private suspend fun canUndoLastTap(): Boolean {
@@ -175,6 +222,7 @@ class ChalisaLockScreenCounter @Inject constructor(
 
     @SuppressLint("MissingPermission")
     private fun show(content: LockScreenContent) {
+        lastContent = content.copy(note = null)
         if (!canPostNotifications()) return
         ensureChannel()
         val openApp = PendingIntent.getActivity(
@@ -204,11 +252,13 @@ class ChalisaLockScreenCounter @Inject constructor(
         notifications.notify(NOTIFICATION_ID, builder.build())
     }
 
-    /** The marathon isn't running: say so, and let the reader swipe the notification away. */
+    /**
+     * The marathon isn't running: say so, and let the reader swipe the notification away.
+     * The reader's on/off choice is kept, so the counter comes back for the next marathon.
+     */
     @SuppressLint("MissingPermission")
     private suspend fun showEnded(note: String?) {
         store.clearLastTap()
-        if (note == null) store.setLockScreenCounter(false)
         if (!canPostNotifications()) return
         ensureChannel()
         notifications.notify(
@@ -229,6 +279,6 @@ class ChalisaLockScreenCounter @Inject constructor(
 
     /** Home found no running marathon: clear a counter that's still showing. */
     suspend fun onNoMarathonRunning() {
-        if (store.isLockScreenCounterOn()) showEnded(null)
+        if (isCounterShowing()) showEnded(null)
     }
 }

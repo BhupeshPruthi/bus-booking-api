@@ -38,8 +38,8 @@ class FallbackDns private constructor(
     companion object {
         fun create(): FallbackDns {
             val bootstrapClient = OkHttpClient.Builder()
-                .connectTimeout(5, TimeUnit.SECONDS)
-                .readTimeout(5, TimeUnit.SECONDS)
+                .connectTimeout(3, TimeUnit.SECONDS)
+                .readTimeout(3, TimeUnit.SECONDS)
                 .build()
 
             val cloudflare = DnsOverHttps.Builder()
