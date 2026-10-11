@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.Bundle
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -57,6 +58,8 @@ class ChalisaLockScreenCounter @Inject constructor(
 
         /** Lock-screen buttons must finish well inside Android's background broadcast limit. */
         const val BUTTON_TIMEOUT_MILLIS = 9_000L
+        private const val EXTRA_IS_COUNTER = "com.mybus.app.chalisa.IS_COUNTER"
+        const val ALREADY_COUNTED_NOTE = "Your last round was already counted. If you've finished another, tap +1 again."
         const val TIMED_OUT_NOTE = "The connection is very slow. This round may not have been counted. Tap +1 again; it won't count twice."
     }
 
@@ -84,7 +87,7 @@ class ChalisaLockScreenCounter @Inject constructor(
     /** The +1 counter (not the "ended" message) is on the lock screen right now. */
     fun isCounterShowing(): Boolean =
         context.getSystemService(NotificationManager::class.java).activeNotifications
-            .any { it.id == NOTIFICATION_ID && it.isOngoing }
+            .any { it.id == NOTIFICATION_ID && it.notification.extras.getBoolean(EXTRA_IS_COUNTER) }
 
     /**
      * Puts the counter on the lock screen while a marathon runs, unless the reader turned it off.
@@ -132,6 +135,12 @@ class ChalisaLockScreenCounter @Inject constructor(
         var outcome = "Round counted"
         repository.addRound()
             .onSuccess { counts ->
+                if (counts.duplicate) {
+                    // The id of an earlier tap whose answer was lost: that round was counted then.
+                    outcome = ALREADY_COUNTED_NOTE
+                    if (store.isLockScreenCounterOn()) showNote(outcome)
+                    return@onSuccess
+                }
                 counts.reading?.let { store.saveLastTap(it.clientRequestId, it.undoUntil) }
                 if (store.isLockScreenCounterOn()) show(counts.toContent(canUndo = true, note = outcome))
             }
@@ -166,9 +175,10 @@ class ChalisaLockScreenCounter @Inject constructor(
     /** Shows what went wrong and returns it as a short line for the tile. */
     private suspend fun handleFailure(error: Throwable): String {
         val note = when ((error as? ChalisaException)?.code) {
-            ChalisaErrorCodes.MARATHON_NOT_RUNNING -> return "No marathon".also { showEnded(null) }
+            ChalisaErrorCodes.MARATHON_NOT_RUNNING ->
+                return "No marathon".also { if (store.isLockScreenCounterOn()) showEnded(null) }
             ChalisaErrorCodes.MARATHON_NOT_STARTED -> "Counting opens when the marathon starts."
-                .also { showEnded(it); return "Not started" }
+                .also { if (store.isLockScreenCounterOn()) showEnded(it); return "Not started" }
             ChalisaErrorCodes.NAME_REQUIRED, ChalisaErrorCodes.INVALID_GUEST_TOKEN ->
                 "Open the app and enter your name to count"
             // The server may have counted it; the next +1 reuses the same id, so it can't count twice.
@@ -179,10 +189,48 @@ class ChalisaLockScreenCounter @Inject constructor(
         return note
     }
 
-    /** Adds a note to what's showing, using the last numbers instead of reloading them. */
+    /**
+     * Adds a note to what's showing, using the last numbers instead of reloading them. Never
+     * calls the network: it also runs after a button has used up its time.
+     */
     private suspend fun showNote(note: String) {
         val current = lastContent
-        if (current != null) show(current.copy(note = note, canUndo = canUndoLastTap())) else refresh(note)
+        if (current != null) show(current.copy(note = note, canUndo = canUndoLastTap())) else showWithoutNumbers(note)
+    }
+
+    /** The counter with just a note, when the numbers aren't known yet (e.g. right after a restart). */
+    @SuppressLint("MissingPermission")
+    private suspend fun showWithoutNumbers(note: String) {
+        if (!canPostNotifications()) return
+        ensureChannel()
+        notifications.notify(NOTIFICATION_ID, counterBuilder(canUndo = canUndoLastTap())
+            .setContentTitle("Hanuman Chalisa")
+            .setContentText(note)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(note))
+            .build())
+    }
+
+    /** Shared look and buttons of the +1 counter notification. */
+    private fun counterBuilder(canUndo: Boolean): NotificationCompat.Builder {
+        val openApp = PendingIntent.getActivity(
+            context,
+            0,
+            Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_stat_chalisa)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setShowWhen(false)
+            .setContentIntent(openApp)
+            .addExtras(Bundle().apply { putBoolean(EXTRA_IS_COUNTER, true) })
+            .addAction(0, "+1 Round", actionIntent(ACTION_COUNT, 1))
+        if (canUndo) builder.addAction(0, "Undo", actionIntent(ACTION_UNDO, 2))
+        builder.addAction(0, "Stop", actionIntent(ACTION_STOP, 3))
+        return builder
     }
 
     private suspend fun canUndoLastTap(): Boolean {
@@ -225,31 +273,16 @@ class ChalisaLockScreenCounter @Inject constructor(
         lastContent = content.copy(note = null)
         if (!canPostNotifications()) return
         ensureChannel()
-        val openApp = PendingIntent.getActivity(
-            context,
-            0,
-            Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
         val detail = buildString {
             parseInstant(content.lastReadAt)?.let { append("Last round at ${formatLastRound(it)} · ") }
             append("Group ${formatCount(content.groupTotal)}")
         }
-        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_stat_chalisa)
+        val notification = counterBuilder(content.canUndo)
             .setContentTitle("Today ${formatCount(content.today)} · Marathon ${formatCount(content.marathonCount)}")
             .setContentText(content.note ?: detail)
             .setStyle(NotificationCompat.BigTextStyle().bigText(listOfNotNull(content.note, detail).joinToString("\n")))
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setOngoing(true)
-            .setOnlyAlertOnce(true)
-            .setShowWhen(false)
-            .setContentIntent(openApp)
-            .addAction(0, "+1 Round", actionIntent(ACTION_COUNT, 1))
-        if (content.canUndo) builder.addAction(0, "Undo", actionIntent(ACTION_UNDO, 2))
-        builder.addAction(0, "Stop", actionIntent(ACTION_STOP, 3))
-        notifications.notify(NOTIFICATION_ID, builder.build())
+            .build()
+        notifications.notify(NOTIFICATION_ID, notification)
     }
 
     /**

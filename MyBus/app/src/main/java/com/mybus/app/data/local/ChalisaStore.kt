@@ -30,6 +30,10 @@ class ChalisaStore @Inject constructor(
         private val LAST_TAP_ID = stringPreferencesKey("last_tap_id")
         private val LAST_TAP_UNDO_UNTIL = stringPreferencesKey("last_tap_undo_until")
         private val PENDING_ROUND_ID = stringPreferencesKey("pending_round_id")
+        private val PENDING_ROUND_SINCE = stringPreferencesKey("pending_round_since")
+
+        /** A lost answer is retried within minutes; an older pending id is dropped, not reused. */
+        private const val PENDING_ROUND_MAX_AGE_MILLIS = 10 * 60 * 1000L
     }
 
     val guestToken: Flow<String?> = context.chalisaDataStore.data.map { it[GUEST_TOKEN] }
@@ -56,10 +60,23 @@ class ChalisaStore @Inject constructor(
      * Id of a +1 whose answer never arrived (timeout, lost connection). The server may have
      * counted it, so the next +1 reuses this id and can't be counted twice.
      */
-    suspend fun pendingRoundId(): String? = context.chalisaDataStore.data.first()[PENDING_ROUND_ID]
+    suspend fun pendingRoundId(): String? {
+        val prefs = context.chalisaDataStore.data.first()
+        val id = prefs[PENDING_ROUND_ID] ?: return null
+        val since = prefs[PENDING_ROUND_SINCE]?.toLongOrNull() ?: return null
+        return id.takeIf { System.currentTimeMillis() - since in 0..PENDING_ROUND_MAX_AGE_MILLIS }
+    }
 
     suspend fun setPendingRoundId(id: String?) {
-        context.chalisaDataStore.edit { if (id == null) it.remove(PENDING_ROUND_ID) else it[PENDING_ROUND_ID] = id }
+        context.chalisaDataStore.edit {
+            if (id == null) {
+                it.remove(PENDING_ROUND_ID)
+                it.remove(PENDING_ROUND_SINCE)
+            } else if (it[PENDING_ROUND_ID] != id) {
+                it[PENDING_ROUND_ID] = id
+                it[PENDING_ROUND_SINCE] = System.currentTimeMillis().toString()
+            }
+        }
     }
 
     /** The latest tap, so the lock-screen Undo knows what to remove. */

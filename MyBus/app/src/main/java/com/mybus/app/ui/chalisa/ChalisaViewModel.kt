@@ -256,6 +256,12 @@ class ChalisaViewModel @Inject constructor(
             _uiState.update { it.copy(isCounting = true) }
             repository.addRound()
                 .onSuccess { result ->
+                    if (result.duplicate) {
+                        // An earlier tap whose answer was lost had already been counted.
+                        send(ChalisaLockScreenCounter.ALREADY_COUNTED_NOTE)
+                        refresh()
+                        return@onSuccess
+                    }
                     _uiState.update { state ->
                         state.copy(
                             lastTap = result.reading,

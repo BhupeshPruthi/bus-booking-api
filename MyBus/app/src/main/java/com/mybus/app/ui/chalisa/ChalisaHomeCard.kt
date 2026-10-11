@@ -39,10 +39,15 @@ class ChalisaHomeViewModel @Inject constructor(
     private val _summary = MutableStateFlow<ChalisaSummary?>(null)
     val summary: StateFlow<ChalisaSummary?> = _summary.asStateFlow()
 
+    /** The latest load failed (as opposed to still loading). */
+    private val _loadFailed = MutableStateFlow(false)
+    val loadFailed: StateFlow<Boolean> = _loadFailed.asStateFlow()
+
     /** Called each time Home opens, so an ended marathon disappears from the Home page. */
     fun refresh() {
         viewModelScope.launch {
-            repository.summary().onSuccess { summary ->
+            repository.summary().onFailure { _loadFailed.value = true }.onSuccess { summary ->
+                _loadFailed.value = false
                 _summary.value = summary
                 // A lock-screen counter left on from an ended marathon is cleared here.
                 if (summary.state == "none") lockScreenCounter.onNoMarathonRunning()
@@ -63,12 +68,13 @@ fun ChalisaHomeCard(
     viewModel: ChalisaHomeViewModel = hiltViewModel()
 ) {
     val summary by viewModel.summary.collectAsStateWithLifecycle()
+    val loadFailed by viewModel.loadFailed.collectAsStateWithLifecycle()
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refresh() }
 
     val current = summary
     if (current == null) {
         // Couldn't load: the super admin still gets a way in (the screen shows its own error).
-        if (canManage) AdminScheduleCard(null, onOpen)
+        if (canManage && loadFailed) AdminScheduleCard(null, onOpen)
         return
     }
     val marathon = current.marathon

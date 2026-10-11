@@ -17,8 +17,17 @@ import javax.inject.Singleton
 class ChalisaException(
     val code: String?,
     message: String,
-    val retryAfterSeconds: Int? = null
-) : Exception(message)
+    val retryAfterSeconds: Int? = null,
+    val httpStatus: Int? = null
+) : Exception(message) {
+    /**
+     * The server (or a proxy in front of it) may have saved the request even though it failed:
+     * no connection, a timeout, a 5xx, or an answer that isn't the API's own error.
+     */
+    val outcomeUnknown: Boolean
+        get() = code == ChalisaErrorCodes.NETWORK || code == null ||
+            httpStatus == 408 || (httpStatus != null && httpStatus >= 500)
+}
 
 object ChalisaErrorCodes {
     const val ROUND_TOO_SOON = "ROUND_TOO_SOON"
@@ -30,6 +39,7 @@ object ChalisaErrorCodes {
     const val MARATHON_ALREADY_ACTIVE = "MARATHON_ALREADY_ACTIVE"
     const val UNDO_EXPIRED = "UNDO_EXPIRED"
     const val RESTORE_EXPIRED = "RESTORE_EXPIRED"
+    const val VALIDATION_ERROR = "VALIDATION_ERROR"
     const val NETWORK = "NETWORK"
 }
 
@@ -57,7 +67,7 @@ class ChalisaRepository @Inject constructor(
             val retryAfter = ((error?.details as? Map<*, *>)?.get("retryAfterSeconds") as? Number)?.toInt()
             val message = error?.message?.takeIf { it.isNotBlank() && it != "Internal server error" }
                 ?: "$fallback. Please try again."
-            Result.failure(ChalisaException(error?.code, message, retryAfter))
+            Result.failure(ChalisaException(error?.code, message, retryAfter, response.code()))
         }
     } catch (error: CancellationException) {
         throw error
@@ -97,13 +107,25 @@ class ChalisaRepository @Inject constructor(
      * treats a repeated id as the same round).
      */
     suspend fun addRound(): Result<ChalisaCounts> {
-        val clientRequestId = chalisaStore.pendingRoundId() ?: UUID.randomUUID().toString()
+        val pending = chalisaStore.pendingRoundId()
+        val result = sendRound(pending ?: UUID.randomUUID().toString())
+        // The pending id belongs to someone else (another account signed in on this phone since):
+        // it can't be this person's round, so send it as a new one.
+        val error = result.exceptionOrNull() as? ChalisaException
+        if (pending != null && error?.code == ChalisaErrorCodes.VALIDATION_ERROR && error.httpStatus == 400) {
+            chalisaStore.setPendingRoundId(null)
+            return sendRound(UUID.randomUUID().toString())
+        }
+        return result
+    }
+
+    private suspend fun sendRound(clientRequestId: String): Result<ChalisaCounts> {
         chalisaStore.setPendingRoundId(clientRequestId)
         val result = request("Couldn't count this round") {
             apiService.addChalisaReading(ChalisaReadingRequest(clientRequestId))
         }
-        val answerLost = (result.exceptionOrNull() as? ChalisaException)?.code == ChalisaErrorCodes.NETWORK
-        if (!answerLost) chalisaStore.setPendingRoundId(null)
+        val outcomeUnknown = (result.exceptionOrNull() as? ChalisaException)?.outcomeUnknown == true
+        if (!outcomeUnknown) chalisaStore.setPendingRoundId(null)
         return result
     }
 

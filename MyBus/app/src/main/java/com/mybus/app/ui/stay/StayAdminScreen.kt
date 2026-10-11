@@ -8,6 +8,8 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
+import android.text.TextPaint
+import android.text.TextUtils
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
@@ -426,7 +428,8 @@ private fun DailyOccupancyPage(
     }
 
     // The server sends days oldest first and counts "today" in India time.
-    val today = remember { LocalDate.now(ZoneId.of("Asia/Kolkata")).toString() }
+    // Read on each recomposition (not remembered), so the split moves on after midnight.
+    val today = LocalDate.now(ZoneId.of("Asia/Kolkata")).toString()
     val days = report?.days.orEmpty()
     val upcomingDays = remember(days, today) { days.filter { it.date >= today } }
     val pastDays = remember(days, today) { days.filter { it.date < today }.reversed() }
@@ -650,7 +653,11 @@ private fun createDailyOccupancyPdf(
             "Total earnings ₹${totalEarnings.asRupees()}",
         bodyPaint
     )
-    drawWrapped("Days with no bookings are not listed. Generated $generatedAt (India time).", mutedPaint, extraBottom = 8f)
+    drawWrapped(
+        "Only days and room types with bookings are listed. Generated $generatedAt (India time).",
+        mutedPaint,
+        extraBottom = 8f
+    )
     drawSeparator()
 
     bookedDays.forEach { day ->
@@ -663,22 +670,24 @@ private fun createDailyOccupancyPdf(
         drawWrapped("${day.bookingCount} ${if (day.bookingCount == 1) "booking" else "bookings"}", mutedPaint, extraBottom = 2f)
         units.forEach { unit ->
             ensureSpace(bodyPaint.textSize + 8f)
-            canvas.drawText(unit.displayName, margin + 12f, y, bodyPaint)
-            canvas.drawText(
-                "${unit.bookedUnits} of ${unit.totalUnits} booked · ${unit.availableUnits} available",
-                right,
-                y,
-                bodyRightPaint
-            )
+            val counts = "${unit.bookedUnits} of ${unit.totalUnits} booked · ${unit.availableUnits} available"
+            // A long room name is shortened so it never runs into the numbers on the right.
+            val nameWidth = contentWidth - 12f - bodyRightPaint.measureText(counts) - 16f
+            val name = TextUtils.ellipsize(unit.displayName, TextPaint(bodyPaint), nameWidth, TextUtils.TruncateAt.END)
+            canvas.drawText(name.toString(), margin + 12f, y, bodyPaint)
+            canvas.drawText(counts, right, y, bodyRightPaint)
             y += bodyPaint.textSize + 5f
         }
         y += 4f
         drawSeparator()
     }
 
-    document.finishPage(page)
-    FileOutputStream(pdfFile).use { document.writeTo(it) }
-    document.close()
+    try {
+        document.finishPage(page)
+        FileOutputStream(pdfFile).use { document.writeTo(it) }
+    } finally {
+        document.close()
+    }
     return pdfFile
 }
 
