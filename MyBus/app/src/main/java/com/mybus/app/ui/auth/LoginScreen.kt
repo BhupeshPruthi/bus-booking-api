@@ -186,7 +186,7 @@ fun LoginScreen(
             }
             onSignInError(googleSignInErrorMessage(context, webClientId, e))
         } catch (e: Throwable) {
-            onSignInError("Sign-in error: ${e.message ?: e.javaClass.simpleName}")
+            onSignInError("Sign-in error: ${e.message ?: "please try again."}")
         }
     }
 
@@ -224,7 +224,7 @@ fun LoginScreen(
             try {
                 googleLauncher.launch(googleSignInClient.signInIntent)
             } catch (e: Throwable) {
-                onSignInError("Sign-in error: ${e.message ?: e.javaClass.simpleName}")
+                onSignInError("Sign-in error: ${e.message ?: "please try again."}")
             }
         }
     }

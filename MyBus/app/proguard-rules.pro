@@ -15,13 +15,12 @@
 -keepclassmembers class * { @com.squareup.moshi.Json <fields>; }
 
 # --- Retrofit API interface ----------------------------------------------
-# Keep the service interface and its generic return types (suspend + Response<ApiResponse<T>>).
+# Retrofit's own rules keep suspend/Response generic types; keep the interface itself.
 -keep,allowobfuscation interface com.mybus.app.data.remote.ApiService
--keep,allowobfuscation,allowshrinking class kotlin.coroutines.Continuation
--keep,allowobfuscation,allowshrinking class retrofit2.Response
 
-# --- Google Sign-In via Credential Manager -------------------------------
-# Required by androidx.credentials (see developer.android.com/identity/sign-in/credential-manager).
+# --- Google Sign-In ------------------------------------------------------
+# LoginScreen uses play-services-auth GoogleSignIn, which ships its own R8 rules.
+# Credential Manager is a dependency but not used yet; this rule is what it needs once it is
+# (developer.android.com/identity/sign-in/credential-manager).
 -if class androidx.credentials.CredentialManager
 -keep class androidx.credentials.playservices.** { *; }
--keep class com.google.android.libraries.identity.googleid.** { *; }
