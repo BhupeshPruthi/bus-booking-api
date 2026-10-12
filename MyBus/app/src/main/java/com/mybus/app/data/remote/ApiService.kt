@@ -283,6 +283,10 @@ interface ApiService {
     @POST("chalisa/readings")
     suspend fun addChalisaReading(@Body request: ChalisaReadingRequest): Response<ApiResponse<ChalisaCounts>>
 
+    /** Admin only: adds rounds to the admin's own entry. Undo with [undoChalisaReading]. */
+    @POST("admin/chalisa/readings")
+    suspend fun addChalisaAdminRounds(@Body request: ChalisaAdminReadingRequest): Response<ApiResponse<ChalisaCounts>>
+
     @DELETE("chalisa/readings/{clientRequestId}")
     suspend fun undoChalisaReading(
         @Path("clientRequestId") clientRequestId: String

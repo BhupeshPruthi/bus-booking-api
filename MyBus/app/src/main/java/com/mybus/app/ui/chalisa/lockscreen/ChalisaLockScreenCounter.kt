@@ -103,7 +103,7 @@ class ChalisaLockScreenCounter @Inject constructor(
         if (!store.isLockScreenCounterOn()) return
         val summary = repository.summary().getOrNull()
         if (summary != null && summary.state != "running") {
-            showEnded(if (summary.state == "scheduled") "Counting opens when the marathon starts." else null)
+            showEnded(if (summary.state == "scheduled") "Counting opens when the Path starts." else null)
             return
         }
         val me = repository.myStats().getOrNull()
@@ -176,8 +176,8 @@ class ChalisaLockScreenCounter @Inject constructor(
     private suspend fun handleFailure(error: Throwable): String {
         val note = when ((error as? ChalisaException)?.code) {
             ChalisaErrorCodes.MARATHON_NOT_RUNNING ->
-                return "No marathon".also { if (store.isLockScreenCounterOn()) showEnded(null) }
-            ChalisaErrorCodes.MARATHON_NOT_STARTED -> "Counting opens when the marathon starts."
+                return "No Path".also { if (store.isLockScreenCounterOn()) showEnded(null) }
+            ChalisaErrorCodes.MARATHON_NOT_STARTED -> "Counting opens when the Path starts."
                 .also { if (store.isLockScreenCounterOn()) showEnded(it); return "Not started" }
             ChalisaErrorCodes.NAME_REQUIRED, ChalisaErrorCodes.INVALID_GUEST_TOKEN ->
                 "Open the app and enter your name to count"
@@ -278,7 +278,7 @@ class ChalisaLockScreenCounter @Inject constructor(
             append("Group ${formatCount(content.groupTotal)}")
         }
         val notification = counterBuilder(content.canUndo)
-            .setContentTitle("Today ${formatCount(content.today)} · Marathon ${formatCount(content.marathonCount)}")
+            .setContentTitle("Today ${formatCount(content.today)} · Path ${formatCount(content.marathonCount)}")
             .setContentText(content.note ?: detail)
             .setStyle(NotificationCompat.BigTextStyle().bigText(listOfNotNull(content.note, detail).joinToString("\n")))
             .build()
@@ -298,7 +298,7 @@ class ChalisaLockScreenCounter @Inject constructor(
             NOTIFICATION_ID,
             NotificationCompat.Builder(context, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_stat_chalisa)
-                .setContentTitle(if (note == null) "The marathon has ended" else "Hanuman Chalisa")
+                .setContentTitle(if (note == null) "The Path has ended" else "Hanuman Chalisa")
                 .setContentText(note ?: "Thank you for taking part. Your readings are in your Profile.")
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setPriority(NotificationCompat.PRIORITY_LOW)

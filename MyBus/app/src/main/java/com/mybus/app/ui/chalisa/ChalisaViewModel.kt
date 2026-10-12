@@ -29,6 +29,9 @@ import javax.inject.Inject
 /** Effective state of the marathon, with "scheduled" turning into "running" at the start time. */
 enum class MarathonPhase { NONE, SCHEDULED, RUNNING }
 
+/** Largest number of rounds an admin can add in one go (matches the server). */
+const val MAX_ADMIN_ADDITION = 5000
+
 data class ChalisaUiState(
     val isLoading: Boolean = true,
     val isRefreshing: Boolean = false,
@@ -44,6 +47,9 @@ data class ChalisaUiState(
     val isCounting: Boolean = false,
     val lastTap: ChalisaReading? = null,
     val canManage: Boolean = false,
+    /** Admin only: rounds typed into "Add rounds" on My path. */
+    val adminAddText: String = "",
+    val isAddingAdmin: Boolean = false,
     val serverOffsetMillis: Long = 0,
     val showEndSheet: Boolean = false,
     val endConfirmText: String = "",
@@ -159,6 +165,37 @@ class ChalisaViewModel @Inject constructor(
     }
 
     fun onJoinNameChange(value: String) = _uiState.update { it.copy(joinName = value.take(40)) }
+
+    fun onAdminAddChange(value: String) =
+        _uiState.update { it.copy(adminAddText = value.filter(Char::isDigit).take(4)) }
+
+    /** Admin only: adds the typed number of rounds to the admin's own entry. */
+    fun addAdminRounds() {
+        val state = _uiState.value
+        if (state.isAddingAdmin) return
+        val count = state.adminAddText.toIntOrNull() ?: 0
+        if (count < 1 || count > MAX_ADMIN_ADDITION) {
+            send("Enter between 1 and ${formatCount(MAX_ADMIN_ADDITION)} rounds.")
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(isAddingAdmin = true) }
+            repository.addAdminRounds(count)
+                .onSuccess { result ->
+                    _uiState.update { it.copy(adminAddText = "", lastTap = result.reading) }
+                    lockScreenCounter.onCountsChanged(result)
+                    result.reading?.let {
+                        send(
+                            "Added ${formatCount(count)} ${if (count == 1) "round" else "rounds"}.",
+                            ChalisaAction.UndoRound(it.clientRequestId)
+                        )
+                    }
+                }
+                .onFailure { handleFailure(it) }
+            _uiState.update { it.copy(isAddingAdmin = false) }
+            refresh()
+        }
+    }
 
     fun onStartingCountChange(value: String) =
         _uiState.update { it.copy(startingCountText = value.filter(Char::isDigit).take(4)) }
@@ -364,7 +401,7 @@ class ChalisaViewModel @Inject constructor(
             repository.end(marathonId, state.endConfirmText)
                 .onSuccess { archived ->
                     _uiState.update { it.copy(showEndSheet = false, recentlyEnded = archived) }
-                    send("Marathon ended and archived.", ChalisaAction.RestoreMarathon(archived.id))
+                    send("Path ended and archived.", ChalisaAction.RestoreMarathon(archived.id))
                 }
                 .onFailure { handleFailure(it) }
             _uiState.update { it.copy(isEnding = false) }
@@ -377,7 +414,7 @@ class ChalisaViewModel @Inject constructor(
             repository.restore(marathonId)
                 .onSuccess {
                     _uiState.update { it.copy(recentlyEnded = null) }
-                    send("The marathon is running again.")
+                    send("The Path is running again.")
                 }
                 .onFailure {
                     _uiState.update { state -> state.copy(recentlyEnded = null) }
@@ -394,7 +431,7 @@ class ChalisaViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(showCancelDialog = false) }
             repository.cancel(marathonId)
-                .onSuccess { send("The scheduled marathon was cancelled.") }
+                .onSuccess { send("The scheduled Path was cancelled.") }
                 .onFailure { handleFailure(it) }
             refresh()
         }

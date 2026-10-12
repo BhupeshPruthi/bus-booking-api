@@ -33,7 +33,7 @@ class ChalisaTileService : TileService() {
                 subtitle = when {
                     summary == null -> null
                     running -> "Today ${formatCount(summary.myToday)}"
-                    else -> "No marathon"
+                    else -> "No Path"
                 }
             )
         }

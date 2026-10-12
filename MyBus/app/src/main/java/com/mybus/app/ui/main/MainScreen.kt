@@ -189,7 +189,7 @@ fun MainScreen(
                     },
                     canManageChalisa = canManageChalisa,
                     onOpenChalisa = {
-                        tabNavController.navigate("hanuman_chalisa?tab=$CHALISA_TAB_GROUP") { launchSingleTop = true }
+                        tabNavController.navigate("hanuman_chalisa?tab=$CHALISA_TAB_MY_PATH") { launchSingleTop = true }
                     },
                     onScheduleChalisa = {
                         tabNavController.navigate("chalisa_schedule") { launchSingleTop = true }
@@ -271,10 +271,10 @@ fun MainScreen(
             }
             composable(
                 route = CHALISA_ROUTE,
-                arguments = listOf(navArgument("tab") { type = NavType.IntType; defaultValue = CHALISA_TAB_GROUP })
+                arguments = listOf(navArgument("tab") { type = NavType.IntType; defaultValue = CHALISA_TAB_MY_PATH })
             ) { backStackEntry ->
                 ChalisaScreen(
-                    initialTab = backStackEntry.arguments?.getInt("tab") ?: CHALISA_TAB_GROUP,
+                    initialTab = backStackEntry.arguments?.getInt("tab") ?: CHALISA_TAB_MY_PATH,
                     onBack = { tabNavController.popBackStack() },
                     onOpenArchive = { tabNavController.navigate(CHALISA_ARCHIVE_ROUTE) { launchSingleTop = true } },
                     onSchedule = { marathonId ->
