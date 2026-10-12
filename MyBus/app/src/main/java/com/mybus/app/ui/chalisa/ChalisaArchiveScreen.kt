@@ -61,7 +61,7 @@ fun ChalisaArchiveScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Past marathons", fontWeight = FontWeight.Bold) },
+                title = { Text("History", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
                 }
@@ -77,7 +77,7 @@ fun ChalisaArchiveScreen(
                     Button(onClick = viewModel::load) { Text("Retry") }
                 }
                 state.marathons.isEmpty() -> Text(
-                    "Finished marathons will appear here.",
+                    "Finished Paths will appear here.",
                     modifier = Modifier.align(Alignment.Center).padding(24.dp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

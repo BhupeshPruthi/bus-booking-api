@@ -42,16 +42,25 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.mybus.app.data.remote.dto.ChalisaBoardEntry
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.ui.focus.onFocusEvent
+import androidx.compose.ui.composed
+import kotlinx.coroutines.launch
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.foundation.text.KeyboardActions
 import kotlinx.coroutines.delay
 import java.time.Instant
 
-const val CHALISA_TAB_GROUP = 0
-const val CHALISA_TAB_MY_PATH = 1
+// Tab order: My path first, Live Path second.
+const val CHALISA_TAB_MY_PATH = 0
+const val CHALISA_TAB_GROUP = 1
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChalisaScreen(
-    initialTab: Int = CHALISA_TAB_GROUP,
+    initialTab: Int = CHALISA_TAB_MY_PATH,
     onBack: () -> Unit,
     onOpenArchive: () -> Unit,
     onSchedule: (marathonId: String?) -> Unit,
@@ -138,13 +147,13 @@ fun ChalisaScreen(
                     if (state.canManage) {
                         Box {
                             IconButton(onClick = { menuOpen = true }) {
-                                Icon(Icons.Filled.MoreVert, contentDescription = "Marathon options")
+                                Icon(Icons.Filled.MoreVert, contentDescription = "Path options")
                             }
                             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                                 val marathonId = state.marathon?.id
                                 when (phase) {
                                     MarathonPhase.NONE -> DropdownMenuItem(
-                                        text = { Text("Schedule a marathon") },
+                                        text = { Text("Schedule a Path") },
                                         onClick = { menuOpen = false; onSchedule(null) }
                                     )
                                     MarathonPhase.SCHEDULED -> {
@@ -153,7 +162,7 @@ fun ChalisaScreen(
                                             onClick = { menuOpen = false; onSchedule(marathonId) }
                                         )
                                         DropdownMenuItem(
-                                            text = { Text("Cancel marathon", color = MaterialTheme.colorScheme.error) },
+                                            text = { Text("Cancel Path", color = MaterialTheme.colorScheme.error) },
                                             onClick = { menuOpen = false; viewModel.showCancelDialog(true) }
                                         )
                                     }
@@ -163,13 +172,13 @@ fun ChalisaScreen(
                                             onClick = { menuOpen = false; onSchedule(marathonId) }
                                         )
                                         DropdownMenuItem(
-                                            text = { Text("End marathon", color = MaterialTheme.colorScheme.error) },
+                                            text = { Text("End Path", color = MaterialTheme.colorScheme.error) },
                                             onClick = { menuOpen = false; viewModel.showEndSheet(true) }
                                         )
                                     }
                                 }
                                 DropdownMenuItem(
-                                    text = { Text("Past marathons") },
+                                    text = { Text("History") },
                                     onClick = { menuOpen = false; onOpenArchive() }
                                 )
                             }
@@ -184,15 +193,15 @@ fun ChalisaScreen(
             TabRow(selectedTabIndex = selectedTab) {
                 val unselected = MaterialTheme.colorScheme.onSurfaceVariant
                 Tab(
-                    selected = selectedTab == CHALISA_TAB_GROUP,
-                    onClick = { selectedTab = CHALISA_TAB_GROUP },
-                    text = { Text("Group marathon") },
-                    unselectedContentColor = unselected
-                )
-                Tab(
                     selected = selectedTab == CHALISA_TAB_MY_PATH,
                     onClick = { selectedTab = CHALISA_TAB_MY_PATH },
                     text = { Text("My path") },
+                    unselectedContentColor = unselected
+                )
+                Tab(
+                    selected = selectedTab == CHALISA_TAB_GROUP,
+                    onClick = { selectedTab = CHALISA_TAB_GROUP },
+                    text = { Text("Live Path") },
                     unselectedContentColor = unselected
                 )
             }
@@ -239,11 +248,11 @@ fun ChalisaScreen(
     if (state.showCancelDialog) {
         AlertDialog(
             onDismissRequest = { viewModel.showCancelDialog(false) },
-            title = { Text("Cancel the scheduled marathon?") },
+            title = { Text("Cancel the scheduled Path?") },
             text = { Text("It will disappear from everyone's Home page. Nobody has read in it yet, so nothing is lost.") },
             confirmButton = {
                 TextButton(onClick = viewModel::cancelScheduledMarathon) {
-                    Text("Cancel marathon", color = MaterialTheme.colorScheme.error)
+                    Text("Cancel Path", color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = { TextButton(onClick = { viewModel.showCancelDialog(false) }) { Text("Keep it") } }
@@ -277,7 +286,8 @@ private fun GroupMarathonTab(
 ) {
     val board = state.board
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        // Edge-to-edge: shrink the list above the keyboard so focused fields stay visible.
+        modifier = Modifier.fillMaxSize().imePadding(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -294,7 +304,7 @@ private fun GroupMarathonTab(
                 item {
                     Text(
                         if (phase == MarathonPhase.RUNNING) "Nobody has counted yet. Be the first."
-                        else "The board fills up once the marathon starts.",
+                        else "The board fills up once the Path starts.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
                         textAlign = TextAlign.Center
@@ -308,7 +318,7 @@ private fun GroupMarathonTab(
         }
         item {
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                TextButton(onClick = onOpenArchive) { Text("Past marathons") }
+                TextButton(onClick = onOpenArchive) { Text("History") }
                 if (phase != MarathonPhase.NONE) {
                     Text(
                         "Updates every 30 seconds",
@@ -382,9 +392,9 @@ private fun NoMarathonCard(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Icon(Icons.Filled.LocalFireDepartment, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(40.dp))
-        Text("No marathon is running right now", style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
+        Text("No Path is running right now", style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
         Text(
-            "When the next marathon is scheduled, it'll appear on the Home page. Your own readings are always in your Profile.",
+            "When the next Path is scheduled, it'll appear on the Home page. Your own readings are always in your Profile.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
@@ -404,7 +414,7 @@ private fun NoMarathonCard(
                     }
                 }
             }
-            Button(onClick = onSchedule, modifier = Modifier.padding(top = 8.dp)) { Text("Schedule a marathon") }
+            Button(onClick = onSchedule, modifier = Modifier.padding(top = 8.dp)) { Text("Schedule a Path") }
         }
     }
 }
@@ -417,7 +427,7 @@ private fun MyRankRow(rank: Int?, count: Long) {
     ) {
         Row(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(
-                if (rank != null) "You · rank $rank" else "You haven't counted in this marathon yet",
+                if (rank != null) "You · rank $rank" else "You haven't participated in this Path yet",
                 modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.bodyMedium
             )
@@ -449,6 +459,10 @@ private fun BoardRow(entry: ChalisaBoardEntry, isMe: Boolean) {
             Text("guest", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.width(8.dp))
         }
+        if (entry.hasAdminAdditions) {
+            Text("incl. admin additions", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.width(8.dp))
+        }
         Text(formatCount(entry.count), fontWeight = FontWeight.SemiBold)
     }
     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
@@ -460,10 +474,10 @@ private fun BoardRow(entry: ChalisaBoardEntry, isMe: Boolean) {
 private fun JoinCard(state: ChalisaUiState, phase: MarathonPhase, viewModel: ChalisaViewModel) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("Join the group path", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text("Join the Live Path", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text(
                 if (phase == MarathonPhase.RUNNING) "Enter the name to show on the board, then tap +1 after each round."
-                else "Enter your name now. Counting opens when the marathon starts.",
+                else "Enter your name now. Counting opens when the Path starts.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -473,7 +487,7 @@ private fun JoinCard(state: ChalisaUiState, phase: MarathonPhase, viewModel: Cha
                 label = { Text("Your name on the board") },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().bringIntoViewWhenFocused()
             )
             if (phase == MarathonPhase.RUNNING) {
                 StartingCountField(state = state, viewModel = viewModel)
@@ -501,8 +515,61 @@ private fun StartingCountField(state: ChalisaUiState, viewModel: ChalisaViewMode
         },
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth().bringIntoViewWhenFocused()
     )
+}
+
+/**
+ * Scrolls a text field (and its supporting text) above the keyboard when it gains focus.
+ * The short delay lets the keyboard finish opening so the list has its final height.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+private fun Modifier.bringIntoViewWhenFocused(): Modifier = composed {
+    val requester = remember { BringIntoViewRequester() }
+    val scope = rememberCoroutineScope()
+    this
+        .bringIntoViewRequester(requester)
+        .onFocusEvent { focus ->
+            if (focus.isFocused) scope.launch {
+                delay(300)
+                requester.bringIntoView()
+            }
+        }
+}
+
+/** Admin only: add rounds read offline to the admin's own entry, any time during a live Path. */
+@Composable
+private fun AdminAddRoundsCard(state: ChalisaUiState, viewModel: ChalisaViewModel) {
+    OutlinedCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Add rounds", fontWeight = FontWeight.SemiBold)
+            Text(
+                "Admin only. Adds rounds to your own count on the board. You can undo an addition for 2 minutes.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = state.adminAddText,
+                    onValueChange = viewModel::onAdminAddChange,
+                    label = { Text("Rounds") },
+                    singleLine = true,
+                    enabled = !state.isAddingAdmin,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { viewModel.addAdminRounds() }),
+                    modifier = Modifier.weight(1f).bringIntoViewWhenFocused()
+                )
+                Button(
+                    onClick = viewModel::addAdminRounds,
+                    enabled = !state.isAddingAdmin && state.adminAddText.isNotEmpty(),
+                    modifier = Modifier.height(56.dp)
+                ) {
+                    if (state.isAddingAdmin) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                    else Text("Add")
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -521,8 +588,8 @@ private fun StartingCountConfirmDialog(
                 Text("readings already done", style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    "These will be added to ${marathonTitle ?: "the marathon"} and your lifetime count. " +
-                        "You can add a starting count only once for this marathon.",
+                    "These will be added to ${marathonTitle ?: "the Path"} and your lifetime count. " +
+                        "You can add a starting count only once for this Path.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -540,7 +607,8 @@ private fun MyPathTab(state: ChalisaUiState, phase: MarathonPhase, viewModel: Ch
     val me = state.me
     val haptics = LocalHapticFeedback.current
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        // Edge-to-edge: shrink the list above the keyboard so focused fields stay visible.
+        modifier = Modifier.fillMaxSize().imePadding(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -550,7 +618,7 @@ private fun MyPathTab(state: ChalisaUiState, phase: MarathonPhase, viewModel: Ch
             } else {
                 item {
                     Text(
-                        "Counting opens when the next marathon starts.",
+                        "Counting opens when the next Path starts.",
                         modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
                         textAlign = TextAlign.Center,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -575,7 +643,7 @@ private fun MyPathTab(state: ChalisaUiState, phase: MarathonPhase, viewModel: Ch
                     Text(
                         buildString {
                             append("Lifetime ${formatCount(me?.lifetime ?: 0)}")
-                            if (phase != MarathonPhase.NONE) append(" · Marathon ${formatCount(marathonCount)}")
+                            if (phase != MarathonPhase.NONE) append(" · Path ${formatCount(marathonCount)}")
                             if ((me?.streakDays ?: 0) > 0) append(" · ${me?.streakDays}-day streak")
                         },
                         style = MaterialTheme.typography.bodyMedium,
@@ -603,10 +671,16 @@ private fun MyPathTab(state: ChalisaUiState, phase: MarathonPhase, viewModel: Ch
                         val tap = state.lastTap
                         val canUndo = tap != null && parseInstant(tap.undoUntil)?.isAfter(Instant.now()) == true
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (lastRead != null) {
+                            val lastAction = when {
+                                tap?.kind == "admin" && canUndo ->
+                                    "Added ${formatCount(tap.count)} ${if (tap.count == 1) "round" else "rounds"}"
+                                lastRead == null -> null
+                                tap?.kind == "opening" -> "Starting count added at ${formatLastRound(lastRead)}"
+                                else -> "Last round at ${formatLastRound(lastRead)}"
+                            }
+                            if (lastAction != null) {
                                 Text(
-                                    (if (tap?.kind == "opening") "Starting count added at " else "Last round at ") +
-                                        formatLastRound(lastRead),
+                                    lastAction,
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -630,7 +704,7 @@ private fun MyPathTab(state: ChalisaUiState, phase: MarathonPhase, viewModel: Ch
                         }
                     }
                     MarathonPhase.NONE -> Text(
-                        "Counting opens when the next marathon starts.",
+                        "Counting opens when the next Path starts.",
                         modifier = Modifier.fillMaxWidth(),
                         textAlign = TextAlign.Center,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -654,6 +728,10 @@ private fun MyPathTab(state: ChalisaUiState, phase: MarathonPhase, viewModel: Ch
                         }
                     }
                 }
+            }
+
+            if (phase == MarathonPhase.RUNNING && state.canManage) {
+                item { AdminAddRoundsCard(state = state, viewModel = viewModel) }
             }
         }
 
@@ -752,7 +830,7 @@ private fun EndMarathonSheet(state: ChalisaUiState, viewModel: ChalisaViewModel)
             Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("End the marathon for everyone?", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.error)
+            Text("End the Path for everyone?", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.error)
             Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(12.dp)) {
                     Text(marathon.title, fontWeight = FontWeight.SemiBold)
@@ -768,7 +846,7 @@ private fun EndMarathonSheet(state: ChalisaUiState, viewModel: ChalisaViewModel)
                 listOf(
                     "Counting stops for all ${formatCount(board?.participantCount ?: 0)} devotees",
                     "It disappears from everyone's Home page",
-                    "Results are saved in Past marathons",
+                    "Results are saved in History",
                     "Everyone's lifetime count stays the same"
                 ).forEach { Text("• $it", style = MaterialTheme.typography.bodyMedium) }
             }
@@ -793,7 +871,7 @@ private fun EndMarathonSheet(state: ChalisaUiState, viewModel: ChalisaViewModel)
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) {
                     if (state.isEnding) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                    else Text("End marathon")
+                    else Text("End Path")
                 }
             }
         }

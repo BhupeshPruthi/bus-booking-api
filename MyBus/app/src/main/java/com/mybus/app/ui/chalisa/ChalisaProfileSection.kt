@@ -85,7 +85,7 @@ fun ChalisaProfileSection(
                 StatTile(me.streakDays.toString(), "Day streak", Modifier.weight(1f))
             }
             if (me.marathons.isNotEmpty()) {
-                Text("Your marathons", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp))
+                Text("Your Paths", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp))
                 me.marathons.take(5).forEach { marathon ->
                     Row(Modifier.fillMaxWidth()) {
                         Text(

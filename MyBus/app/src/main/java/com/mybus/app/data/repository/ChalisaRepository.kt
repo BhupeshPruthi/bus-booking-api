@@ -77,11 +77,11 @@ class ChalisaRepository @Inject constructor(
         Result.failure(ChalisaException(null, "$fallback. Please try again."))
     }
 
-    suspend fun summary() = request("Couldn't load the Hanuman Chalisa marathon") {
+    suspend fun summary() = request("Couldn't load the Hanuman Chalisa Path") {
         apiService.getChalisaSummary()
     }
 
-    suspend fun board() = request("Couldn't load the marathon board") {
+    suspend fun board() = request("Couldn't load the Path board") {
         apiService.getChalisaBoard()
     }
 
@@ -89,7 +89,7 @@ class ChalisaRepository @Inject constructor(
         apiService.getMyChalisa(month)
     }
 
-    suspend fun archive() = request("Couldn't load past marathons") {
+    suspend fun archive() = request("Couldn't load past Paths") {
         apiService.getChalisaArchive()
     }
 
@@ -129,6 +129,12 @@ class ChalisaRepository @Inject constructor(
         return result
     }
 
+    /** Admin only: adds [count] rounds to the admin's own entry in the running Path. */
+    suspend fun addAdminRounds(count: Int, clientRequestId: String = UUID.randomUUID().toString()) =
+        request("Couldn't add the rounds") {
+            apiService.addChalisaAdminRounds(ChalisaAdminReadingRequest(clientRequestId, count))
+        }
+
     suspend fun addStartingCount(count: Int, clientRequestId: String = UUID.randomUUID().toString()) =
         request("Couldn't add your starting count") {
             apiService.addChalisaReading(ChalisaReadingRequest(clientRequestId, startingCount = count))
@@ -141,7 +147,7 @@ class ChalisaRepository @Inject constructor(
     // ---- Super admin ----
 
     suspend fun schedule(title: String, startsAt: Instant?, goal: Long?) =
-        request("Couldn't schedule the marathon") {
+        request("Couldn't schedule the Path") {
             apiService.scheduleChalisaMarathon(
                 ChalisaScheduleRequest(title.trim(), startsAt?.toString(), goal)
             )
@@ -155,15 +161,15 @@ class ChalisaRepository @Inject constructor(
             )
         }.map { it.marathon }
 
-    suspend fun cancel(marathonId: String) = request("Couldn't cancel the marathon") {
+    suspend fun cancel(marathonId: String) = request("Couldn't cancel the Path") {
         apiService.cancelChalisaMarathon(marathonId)
     }
 
-    suspend fun end(marathonId: String, confirmText: String) = request("Couldn't end the marathon") {
+    suspend fun end(marathonId: String, confirmText: String) = request("Couldn't end the Path") {
         apiService.endChalisaMarathon(marathonId, ChalisaEndRequest(confirmText.trim()))
     }.map { it.archived }
 
-    suspend fun restore(marathonId: String) = request("Couldn't undo ending the marathon") {
+    suspend fun restore(marathonId: String) = request("Couldn't undo ending the Path") {
         apiService.restoreChalisaMarathon(marathonId)
     }.map { it.marathon }
 }

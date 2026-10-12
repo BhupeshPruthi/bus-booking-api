@@ -75,7 +75,7 @@ class ChalisaScheduleViewModel @Inject constructor(
                 .onSuccess { summary ->
                     val marathon = summary.marathon?.takeIf { it.id == id }
                     if (marathon == null) {
-                        _uiState.update { it.copy(isLoading = false, error = "This marathon is no longer scheduled or running.") }
+                        _uiState.update { it.copy(isLoading = false, error = "This Path is no longer scheduled or running.") }
                         return@onSuccess
                     }
                     val start = parseInstant(marathon.startsAt)?.atZone(ChalisaZone)
@@ -104,7 +104,7 @@ class ChalisaScheduleViewModel @Inject constructor(
         val state = _uiState.value
         val title = state.title.trim()
         if (title.length < 2) {
-            _uiState.update { it.copy(error = "Enter a name for the marathon.") }
+            _uiState.update { it.copy(error = "Enter a name for the Path.") }
             return
         }
         val goal = state.goalText.toLongOrNull()?.takeIf { it > 0 }
@@ -151,7 +151,7 @@ fun ChalisaScheduleScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (state.isEditing) "Edit marathon" else "Schedule a marathon", fontWeight = FontWeight.Bold) },
+                title = { Text(if (state.isEditing) "Edit Path" else "Schedule a Path", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
                 }
@@ -173,8 +173,8 @@ fun ChalisaScheduleScreen(
             OutlinedTextField(
                 value = state.title,
                 onValueChange = viewModel::onTitleChange,
-                label = { Text("Marathon name") },
-                placeholder = { Text("Hanuman Jayanti marathon") },
+                label = { Text("Path name") },
+                placeholder = { Text("Hanuman Jayanti Path") },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                 modifier = Modifier.fillMaxWidth()
@@ -182,7 +182,7 @@ fun ChalisaScheduleScreen(
 
             if (state.startLocked) {
                 Text(
-                    "This marathon has started, so its start time can't change. You can still edit the name and goal.",
+                    "This Path has started, so its start time can't change. You can still edit the name and goal.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -250,7 +250,7 @@ fun ChalisaScheduleScreen(
 
             Text(
                 if (state.isEditing) "Changes show on everyone's screen the next time they open it."
-                else "Everyone sees the marathon on their Home page as soon as you save. It runs until you end it.",
+                else "Everyone sees the Path on their Home page as soon as you save. It runs until you end it.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -263,7 +263,7 @@ fun ChalisaScheduleScreen(
                 modifier = Modifier.fillMaxWidth().height(50.dp)
             ) {
                 if (state.isSaving) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                else Text(if (state.isEditing) "Save changes" else "Schedule marathon")
+                else Text(if (state.isEditing) "Save changes" else "Schedule Path")
             }
         }
     }

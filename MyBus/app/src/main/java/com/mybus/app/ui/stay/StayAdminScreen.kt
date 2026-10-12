@@ -36,6 +36,7 @@ import com.mybus.app.data.remote.dto.CreateStayBookingRequest
 import com.mybus.app.data.remote.dto.StayBookingItemRequest
 import com.mybus.app.data.remote.dto.StayCancellation
 import com.mybus.app.data.remote.dto.StayCoupon
+import com.mybus.app.data.remote.dto.StayDailyOccupancyBookings
 import com.mybus.app.data.remote.dto.StayDailyOccupancyDay
 import java.time.LocalDate
 import java.time.ZoneId
@@ -695,6 +696,160 @@ private fun formatOccupancyDate(value: String): String = runCatching {
     LocalDate.parse(value).format(DateTimeFormatter.ofPattern("EEE, dd MMM yyyy"))
 }.getOrDefault(value)
 
+/** Shares a PDF guest list of every booking occupying accommodation on one day. */
+private fun exportOccupancyDayGuests(context: Context, details: StayDailyOccupancyBookings) {
+    runCatching {
+        val pdfFile = createOccupancyDayGuestsPdf(context, details)
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", pdfFile)
+        val title = "Guest list - ${formatOccupancyDate(details.date)}"
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "application/pdf"
+            putExtra(Intent.EXTRA_SUBJECT, title)
+            putExtra(Intent.EXTRA_STREAM, uri)
+            clipData = ClipData.newUri(context.contentResolver, title, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(Intent.createChooser(intent, "Share Guest List"))
+    }.onFailure {
+        Toast.makeText(context, "Unable to export guest list PDF", Toast.LENGTH_LONG).show()
+    }
+}
+
+private fun createOccupancyDayGuestsPdf(context: Context, details: StayDailyOccupancyBookings): File {
+    val india = ZoneId.of("Asia/Kolkata")
+    val exportDir = File(context.cacheDir, "exports").apply { mkdirs() }
+    val pdfFile = File(exportDir, "guest_list_${details.date}.pdf")
+    val document = PdfDocument()
+    val pageWidth = 595
+    val pageHeight = 842
+    val margin = 40f
+    val contentWidth = pageWidth - (margin * 2)
+    val right = pageWidth - margin
+    var pageNumber = 1
+    lateinit var page: PdfDocument.Page
+    lateinit var canvas: Canvas
+    var y = margin
+
+    val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.BLACK
+        textSize = 20f
+        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+    }
+    val headingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.BLACK
+        textSize = 13f
+        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+    }
+    val headingRightPaint = Paint(headingPaint).apply { textAlign = Paint.Align.RIGHT }
+    val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.rgb(40, 40, 40)
+        textSize = 11f
+    }
+    val mutedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.rgb(95, 95, 95)
+        textSize = 10f
+    }
+    val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.rgb(210, 210, 210)
+        strokeWidth = 1f
+    }
+
+    fun startPage() {
+        page = document.startPage(PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create())
+        canvas = page.canvas
+        y = margin
+        pageNumber += 1
+    }
+    fun ensureSpace(required: Float) {
+        if (y + required > pageHeight - margin) {
+            document.finishPage(page)
+            startPage()
+        }
+    }
+    fun drawWrapped(text: String, paint: Paint, indent: Float = 0f, extraBottom: Float = 2f) {
+        wrapStayPdfText(text, paint, contentWidth - indent).forEach { line ->
+            ensureSpace(paint.textSize + 8f)
+            canvas.drawText(line, margin + indent, y, paint)
+            y += paint.textSize + 5f
+        }
+        y += extraBottom
+    }
+    fun drawSeparator() {
+        ensureSpace(12f)
+        canvas.drawLine(margin, y, right, y, linePaint)
+        y += 12f
+    }
+
+    val bookings = details.bookings
+    val totalGuests = bookings.sumOf { it.guestCount }
+    val checkIns = bookings.count { it.checkInDate == details.date }
+    val generatedAt = java.time.ZonedDateTime.now(india)
+        .format(DateTimeFormatter.ofPattern("dd MMM yyyy, h:mm a", java.util.Locale.ENGLISH))
+
+    startPage()
+    drawWrapped("Guest list - ${formatOccupancyDate(details.date)}", titlePaint, extraBottom = 6f)
+    drawWrapped(
+        "${bookings.size} ${if (bookings.size == 1) "booking" else "bookings"} · " +
+            "$totalGuests ${if (totalGuests == 1) "guest" else "guests"} · " +
+            "$checkIns checking in today · Estimated earnings ₹${details.totalEarnings.asRupees()}",
+        bodyPaint
+    )
+    details.unitTypes.filter { it.bookedUnits > 0 }.forEach { unit ->
+        drawWrapped(
+            "${unit.displayName}: ${unit.bookedUnits} of ${unit.totalUnits} booked · ${unit.availableUnits} available",
+            mutedPaint
+        )
+    }
+    drawWrapped("Generated $generatedAt (India time).", mutedPaint, extraBottom = 8f)
+    drawSeparator()
+
+    bookings.forEachIndexed { index, booking ->
+        // Keeps a booking's name, contact and rooms together on one page.
+        ensureSpace(110f + booking.items.size * 16f)
+        val guestLabel = "${booking.guestCount} ${if (booking.guestCount == 1) "guest" else "guests"}"
+        val nameWidth = contentWidth - headingRightPaint.measureText(guestLabel) - 16f
+        val name = TextUtils.ellipsize("${index + 1}. ${booking.contactName}", TextPaint(headingPaint), nameWidth, TextUtils.TruncateAt.END)
+        canvas.drawText(name.toString(), margin, y, headingPaint)
+        canvas.drawText(guestLabel, right, y, headingRightPaint)
+        y += headingPaint.textSize + 6f
+
+        val indent = 14f
+        drawWrapped("Phone: ${booking.contactPhone}", bodyPaint, indent)
+        if (booking.contactEmail.isNotBlank()) drawWrapped("Email: ${booking.contactEmail}", bodyPaint, indent)
+        drawWrapped(
+            "${booking.reference} · ${booking.status.stayStatusLabel()} · " +
+                if (booking.checkInDate == details.date) "Checks in today" else "Continuing stay",
+            bodyPaint,
+            indent
+        )
+        drawWrapped(
+            "Stay: ${formatOccupancyDate(booking.checkInDate)} → ${formatOccupancyDate(booking.checkOutDate)} · " +
+                "${booking.nightCount} ${if (booking.nightCount == 1) "night" else "nights"}",
+            bodyPaint,
+            indent
+        )
+        booking.items.forEach { item ->
+            drawWrapped("${item.quantity} × ${item.unitTypeName}", bodyPaint, indent)
+        }
+        val dayAmount = booking.dailyEarningsContribution?.let { " · This day: ₹${it.asRupees()}" }.orEmpty()
+        drawWrapped("Booking total: ₹${booking.totalAmount.asRupees()}$dayAmount", bodyPaint, indent)
+        if (booking.bookingSource == "admin") drawWrapped("Admin booking", mutedPaint, indent)
+        booking.customerNote?.takeIf(String::isNotBlank)?.let {
+            drawWrapped("Note: $it", mutedPaint, indent)
+        }
+        y += 4f
+        drawSeparator()
+    }
+
+    try {
+        document.finishPage(page)
+        FileOutputStream(pdfFile).use { document.writeTo(it) }
+    } finally {
+        document.close()
+    }
+    return pdfFile
+}
+
 @Composable
 private fun DailyOccupancyBookingsPage(state: StayAdminUiState) {
     val selectedDate = state.selectedOccupancyDate
@@ -705,11 +860,24 @@ private fun DailyOccupancyBookingsPage(state: StayAdminUiState) {
         }
         return
     }
+    val context = LocalContext.current
 
     LazyColumn(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        if (details.bookings.isNotEmpty()) {
+            item {
+                OutlinedButton(
+                    onClick = { exportOccupancyDayGuests(context, details) },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Filled.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Export guest list as PDF")
+                }
+            }
+        }
         item {
             Card(
                 colors = CardDefaults.cardColors(

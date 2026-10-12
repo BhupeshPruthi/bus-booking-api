@@ -55,6 +55,8 @@ data class ChalisaBoardEntry(
     @Json(name = "participantId") val participantId: String,
     @Json(name = "displayName") val displayName: String,
     @Json(name = "isGuest") val isGuest: Boolean,
+    /** True when a Chalisa admin added rounds to this entry in one go. */
+    @Json(name = "hasAdminAdditions") val hasAdminAdditions: Boolean = false,
     @Json(name = "count") val count: Long,
     @Json(name = "lastReadAt") val lastReadAt: String? = null
 )
@@ -124,7 +126,7 @@ data class ChalisaMarathonCounts(
 @JsonClass(generateAdapter = true)
 data class ChalisaReading(
     @Json(name = "clientRequestId") val clientRequestId: String,
-    /** "round" | "opening" */
+    /** "round" | "opening" | "admin" (rounds a Chalisa admin added in one go) */
     @Json(name = "kind") val kind: String,
     @Json(name = "count") val count: Int,
     @Json(name = "readAt") val readAt: String,
@@ -159,6 +161,13 @@ data class ChalisaParticipantResult(
 data class ChalisaReadingRequest(
     @Json(name = "clientRequestId") val clientRequestId: String,
     @Json(name = "startingCount") val startingCount: Int? = null
+)
+
+/** Rounds a Chalisa admin adds to their own entry in one go. */
+@JsonClass(generateAdapter = true)
+data class ChalisaAdminReadingRequest(
+    @Json(name = "clientRequestId") val clientRequestId: String,
+    @Json(name = "count") val count: Int
 )
 
 @JsonClass(generateAdapter = true)

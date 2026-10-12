@@ -160,9 +160,9 @@ private fun AdminScheduleCard(summary: ChalisaSummary?, onSchedule: () -> Unit) 
                 Icon(Icons.Filled.LocalFireDepartment, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("Hanuman Chalisa marathon", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text("Hanuman Chalisa Path", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Text(
-                        if (summary == null) "Couldn't load · only you can see this" else "No marathon scheduled · only you can see this",
+                        if (summary == null) "Couldn't load · only you can see this" else "No Path scheduled · only you can see this",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -172,8 +172,8 @@ private fun AdminScheduleCard(summary: ChalisaSummary?, onSchedule: () -> Unit) 
                 Text(
                     when {
                         summary == null -> "Open Hanuman Chalisa"
-                        summary.lastEnded != null -> "Schedule the next marathon"
-                        else -> "Schedule a marathon"
+                        summary.lastEnded != null -> "Schedule the next Path"
+                        else -> "Schedule a Path"
                     }
                 )
             }
