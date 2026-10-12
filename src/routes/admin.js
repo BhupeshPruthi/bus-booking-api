@@ -37,6 +37,7 @@ const {
   chalisaScheduleMarathonSchema,
   chalisaUpdateMarathonSchema,
   chalisaEndMarathonSchema,
+  chalisaAdminReadingSchema,
 } = require('../validators/schemas');
 
 const router = express.Router();
@@ -78,6 +79,18 @@ router.delete(
   chalisaSuperAdmin,
   validate(chalisaMarathonParamsSchema, 'params'),
   chalisaController.cancelMarathon
+);
+
+/**
+ * @route POST /api/admin/chalisa/readings
+ * @desc Add rounds to the admin's own entry in the running Path (undo via DELETE /api/chalisa/readings/:clientRequestId)
+ * @access Chalisa admin
+ */
+router.post(
+  '/chalisa/readings',
+  chalisaSuperAdmin,
+  validate(chalisaAdminReadingSchema),
+  chalisaController.addAdminRounds
 );
 
 /**

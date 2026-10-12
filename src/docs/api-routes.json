@@ -78,7 +78,8 @@
     { "method": "PATCH", "path": "/api/admin/chalisa/marathons/:id", "auth": "bearer+superAdmin", "group": "chalisa-admin" },
     { "method": "DELETE", "path": "/api/admin/chalisa/marathons/:id", "auth": "bearer+superAdmin", "group": "chalisa-admin" },
     { "method": "POST", "path": "/api/admin/chalisa/marathons/:id/end", "auth": "bearer+superAdmin", "group": "chalisa-admin" },
-    { "method": "POST", "path": "/api/admin/chalisa/marathons/:id/restore", "auth": "bearer+superAdmin", "group": "chalisa-admin" }
+    { "method": "POST", "path": "/api/admin/chalisa/marathons/:id/restore", "auth": "bearer+superAdmin", "group": "chalisa-admin" },
+    { "method": "POST", "path": "/api/admin/chalisa/readings", "auth": "bearer+superAdmin", "group": "chalisa-admin" }
   ],
   "myBusAndroidRetrofit": {
     "source": "MyBus/app/src/main/java/com/mybus/app/data/remote/ApiService.kt",
@@ -145,7 +146,8 @@
       "admin/chalisa/marathons/{id}",
       "admin/chalisa/marathons/{id}",
       "admin/chalisa/marathons/{id}/end",
-      "admin/chalisa/marathons/{id}/restore"
+      "admin/chalisa/marathons/{id}/restore",
+      "admin/chalisa/readings"
     ]
   }
 }
