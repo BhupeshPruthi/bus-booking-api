@@ -13,6 +13,14 @@ const recordReading = asyncHandler(async (req, res) => {
   res.status(result.duplicate ? 200 : 201).json({ success: true, data: result });
 });
 
+/** Rounds a Chalisa admin adds to their own entry in one go. */
+const addAdminRounds = asyncHandler(async (req, res) => {
+  const result = await chalisaService.recordReading({ userId: req.user.id }, req.body.clientRequestId, {
+    adminCount: req.body.count,
+  });
+  res.status(result.duplicate ? 200 : 201).json({ success: true, data: result });
+});
+
 const undoReading = asyncHandler(async (req, res) => {
   const result = await chalisaService.undoReading(req.chalisaIdentity, req.params.clientRequestId);
   res.json({ success: true, data: result });
@@ -66,6 +74,7 @@ const restoreMarathon = asyncHandler(async (req, res) => {
 module.exports = {
   saveParticipant,
   recordReading,
+  addAdminRounds,
   undoReading,
   getMyStats,
   getMarathonBoard,

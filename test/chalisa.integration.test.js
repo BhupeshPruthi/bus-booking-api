@@ -161,6 +161,39 @@ test('Hanuman Chalisa marathon lifecycle and counting rules', { skip: !hasTestDa
     await expectCode(chalisa.recordReading(bhupeshId, tap), 'VALIDATION_ERROR');
   });
 
+  await t.test('an admin can add rounds to their own entry in one go, and undo it', async () => {
+    const adminId = { userId: admin.id };
+    const before = await chalisa.getMarathonBoard({});
+    const addition = randomUUID();
+
+    const added = await chalisa.recordReading(adminId, addition, { adminCount: 50 });
+    assert.equal(added.duplicate, false);
+    assert.equal(added.reading.kind, 'admin');
+    assert.equal(added.reading.count, 50);
+    const board = await chalisa.getMarathonBoard({});
+    assert.equal(board.total, before.total + 50);
+    const adminRow = board.leaderboard.find((row) => row.displayName === 'Super Admin');
+    assert.equal(adminRow.count, 50);
+    assert.equal(adminRow.hasAdminAdditions, true);
+    assert.equal(board.leaderboard.find((row) => row.displayName === 'Bhupesh').hasAdminAdditions, false);
+
+    // A retry never counts twice, and the amount is bounded.
+    assert.equal((await chalisa.recordReading(adminId, addition, { adminCount: 50 })).duplicate, true);
+    await expectCode(chalisa.recordReading(adminId, randomUUID(), { adminCount: 0 }), 'VALIDATION_ERROR');
+    await expectCode(chalisa.recordReading(adminId, randomUUID(), { adminCount: 5001 }), 'VALIDATION_ERROR');
+
+    // An addition doesn't start the round timer: a live +1 straight after is counted.
+    const tap = randomUUID();
+    await chalisa.recordReading(adminId, tap);
+    assert.equal((await chalisa.getMarathonBoard({})).total, before.total + 51);
+
+    await chalisa.undoReading(adminId, tap);
+    await chalisa.undoReading(adminId, addition);
+    const after = await chalisa.getMarathonBoard({});
+    assert.equal(after.total, before.total);
+    assert.equal(after.participantCount, before.participantCount);
+  });
+
   await t.test('personal stats include lifetime and each marathon', async () => {
     const me = await chalisa.getMyStats(bhupeshId);
     assert.equal(me.lifetime, 20);

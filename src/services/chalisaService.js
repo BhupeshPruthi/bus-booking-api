@@ -16,6 +16,8 @@ const UNDO_WINDOW_SECONDS = 120;
 const RESTORE_WINDOW_SECONDS = 600;
 /** Readings done before joining can be entered once per marathon, up to this many. */
 const MAX_STARTING_COUNT = 5000;
+/** Largest number of rounds an admin can add to their own entry in one go. */
+const MAX_ADMIN_ADDITION = 5000;
 const BOARD_REFRESH_SECONDS = 30;
 const DEFAULT_BOARD_LIMIT = 100;
 const MAX_BOARD_LIMIT = 200;
@@ -318,12 +320,12 @@ async function addToMarathonTotal(trx, marathonId, participantId, count) {
 function requireRunning(marathon, now = new Date()) {
   const state = marathonState(marathon, now);
   if (state === 'scheduled') {
-    throw appError('Counting opens when the marathon starts.', 409, 'MARATHON_NOT_STARTED', {
+    throw appError('Counting opens when the Path starts.', 409, 'MARATHON_NOT_STARTED', {
       startsAt: marathon.starts_at,
     });
   }
   if (state !== 'running') {
-    throw appError('There is no marathon running right now.', 409, 'MARATHON_NOT_RUNNING');
+    throw appError('There is no Path running right now.', 409, 'MARATHON_NOT_RUNNING');
   }
 }
 
@@ -333,7 +335,7 @@ function requireRunning(marathon, now = new Date()) {
  * clientRequestId never counts twice. A round within MIN_ROUND_SECONDS of the previous
  * entry isn't counted.
  */
-async function recordReading(identity, clientRequestId, { startingCount } = {}, database = db) {
+async function recordReading(identity, clientRequestId, { startingCount, adminCount } = {}, database = db) {
   return database.transaction(async (trx) => {
     // Locking the participant serialises their taps, starting count and retries.
     const participant = await resolveParticipant(identity, trx, { create: true, forUpdate: true });
@@ -365,7 +367,15 @@ async function recordReading(identity, clientRequestId, { startingCount } = {}, 
     let kind = 'round';
     let count = 1;
 
-    if (startingCount != null) {
+    if (adminCount != null) {
+      // Rounds a Chalisa admin reads offline and adds to their own entry in one go.
+      // Not subject to the per-round timer, and it doesn't restart it.
+      if (!Number.isInteger(adminCount) || adminCount < 1 || adminCount > MAX_ADMIN_ADDITION) {
+        throw new ValidationError(`Rounds to add must be between 1 and ${MAX_ADMIN_ADDITION}`);
+      }
+      kind = 'admin';
+      count = adminCount;
+    } else if (startingCount != null) {
       if (!Number.isInteger(startingCount) || startingCount < 1 || startingCount > MAX_STARTING_COUNT) {
         throw new ValidationError(`Starting count must be between 1 and ${MAX_STARTING_COUNT}`);
       }
@@ -406,10 +416,13 @@ async function recordReading(identity, clientRequestId, { startingCount } = {}, 
       })
       .returning('*');
     await addToMarathonTotal(trx, marathon.id, participant.id, count);
-    const [updated] = await trx('chalisa_participants')
-      .where('id', participant.id)
-      .update({ last_read_at: reading.read_at, updated_at: trx.fn.now() })
-      .returning('*');
+    // An admin addition isn't a live round, so it leaves the round timer alone.
+    const [updated] = kind === 'admin'
+      ? [participant]
+      : await trx('chalisa_participants')
+        .where('id', participant.id)
+        .update({ last_read_at: reading.read_at, updated_at: trx.fn.now() })
+        .returning('*');
 
     return {
       reading: formatReading(reading),
@@ -448,6 +461,7 @@ async function undoReading(identity, clientRequestId, database = db) {
 
     const latest = await trx('chalisa_readings')
       .where('participant_id', participant.id)
+      .whereNot('kind', 'admin')
       .max('read_at as last')
       .first();
     const [updated] = await trx('chalisa_participants')
@@ -570,7 +584,13 @@ async function getMarathonBoard(identity, filters = {}, database = db, now = new
             't.last_read_at',
             'p.display_name',
             'p.user_id',
-            database.raw('RANK() OVER (ORDER BY t.total DESC) AS rank')
+            database.raw('RANK() OVER (ORDER BY t.total DESC) AS rank'),
+            database.raw(
+              `EXISTS (SELECT 1 FROM chalisa_readings r
+                        WHERE r.marathon_id = t.marathon_id
+                          AND r.participant_id = t.participant_id
+                          AND r.kind = 'admin') AS has_admin_additions`
+            )
           )
           .as('ranked')
       )
@@ -604,6 +624,7 @@ async function getMarathonBoard(identity, filters = {}, database = db, now = new
       participantId: row.participant_id,
       displayName: row.display_name,
       isGuest: !row.user_id,
+      hasAdminAdditions: row.has_admin_additions === true,
       count: toCount(row.total),
       lastReadAt: row.last_read_at,
     })),
@@ -671,13 +692,13 @@ async function listArchivedMarathons(filters = {}, database = db) {
 
 async function findMarathon(trx, id) {
   const marathon = await trx('chalisa_marathons').where('id', id).forUpdate().first();
-  if (!marathon || marathon.cancelled_at) throw new NotFoundError('Marathon');
+  if (!marathon || marathon.cancelled_at) throw new NotFoundError('Path');
   return marathon;
 }
 
 function alreadyActiveError() {
   return appError(
-    'A marathon is already scheduled or running. Edit or end it first.',
+    'A Path is already scheduled or running. Edit or end it first.',
     409,
     'MARATHON_ALREADY_ACTIVE'
   );
@@ -695,7 +716,7 @@ function parseStart(startsAt, now) {
 /** Super admin: schedules the next marathon. It shows on everyone's Home page immediately. */
 async function scheduleMarathon(adminUserId, { title, startsAt, goal } = {}, database = db, now = new Date()) {
   const cleanTitle = normalizeText(title);
-  if (cleanTitle.length < 2) throw new ValidationError('Enter a name for the marathon');
+  if (cleanTitle.length < 2) throw new ValidationError('Enter a name for the Path');
   const start = parseStart(startsAt, now);
 
   return database.transaction(async (trx) => {
@@ -717,18 +738,18 @@ async function updateMarathon(id, changes = {}, database = db, now = new Date())
   return database.transaction(async (trx) => {
     const marathon = await findMarathon(trx, id);
     const state = marathonState(marathon, now);
-    if (state === 'ended') throw appError('This marathon has already ended.', 409, 'MARATHON_NOT_RUNNING');
+    if (state === 'ended') throw appError('This Path has already ended.', 409, 'MARATHON_NOT_RUNNING');
 
     const update = { updated_at: trx.fn.now() };
     if (changes.title !== undefined) {
       const cleanTitle = normalizeText(changes.title);
-      if (cleanTitle.length < 2) throw new ValidationError('Enter a name for the marathon');
+      if (cleanTitle.length < 2) throw new ValidationError('Enter a name for the Path');
       update.title = cleanTitle;
     }
     if (changes.goal !== undefined) update.goal = changes.goal || null;
     if (changes.startsAt !== undefined) {
       if (state !== 'scheduled') {
-        throw appError('The start time can\'t change after the marathon has started.', 409, 'MARATHON_ALREADY_STARTED');
+        throw appError('The start time can\'t change after the Path has started.', 409, 'MARATHON_ALREADY_STARTED');
       }
       update.starts_at = parseStart(changes.startsAt, now);
     }
@@ -745,7 +766,7 @@ async function cancelMarathon(id, database = db, now = new Date()) {
     const state = marathonState(marathon, now);
     if (state !== 'scheduled') {
       throw appError(
-        state === 'running' ? 'This marathon has started. End it instead.' : 'This marathon has already ended.',
+        state === 'running' ? 'This Path has started. End it instead.' : 'This Path has already ended.',
         409,
         state === 'running' ? 'MARATHON_ALREADY_STARTED' : 'MARATHON_NOT_RUNNING'
       );
@@ -764,9 +785,9 @@ async function endMarathon(adminUserId, id, { confirmText } = {}, database = db,
     const marathon = await findMarathon(trx, id);
     const state = marathonState(marathon, now);
     if (state === 'scheduled') {
-      throw appError('This marathon hasn\'t started yet. Cancel it instead.', 409, 'MARATHON_NOT_STARTED');
+      throw appError('This Path hasn\'t started yet. Cancel it instead.', 409, 'MARATHON_NOT_STARTED');
     }
-    if (state !== 'running') throw appError('This marathon has already ended.', 409, 'MARATHON_NOT_RUNNING');
+    if (state !== 'running') throw appError('This Path has already ended.', 409, 'MARATHON_NOT_RUNNING');
 
     const totals = await marathonTotals(trx, id);
     const [ended] = await trx('chalisa_marathons')
@@ -792,9 +813,9 @@ async function endMarathon(adminUserId, id, { confirmText } = {}, database = db,
 async function restoreMarathon(id, database = db, now = new Date()) {
   return database.transaction(async (trx) => {
     const marathon = await findMarathon(trx, id);
-    if (!marathon.ended_at) throw appError('This marathon is still running.', 409, 'MARATHON_ALREADY_ACTIVE');
+    if (!marathon.ended_at) throw appError('This Path is still running.', 409, 'MARATHON_ALREADY_ACTIVE');
     if (now.getTime() - new Date(marathon.ended_at).getTime() > RESTORE_WINDOW_SECONDS * 1000) {
-      throw appError('The 10 minutes to undo ending this marathon have passed.', 400, 'RESTORE_EXPIRED');
+      throw appError('The 10 minutes to undo ending this Path have passed.', 400, 'RESTORE_EXPIRED');
     }
     if (await currentMarathon(trx, { forUpdate: true })) throw alreadyActiveError();
 
@@ -822,6 +843,7 @@ module.exports = {
   UNDO_WINDOW_SECONDS,
   RESTORE_WINDOW_SECONDS,
   MAX_STARTING_COUNT,
+  MAX_ADMIN_ADDITION,
   END_CONFIRM_TEXT,
   signGuestToken,
   verifyGuestToken,

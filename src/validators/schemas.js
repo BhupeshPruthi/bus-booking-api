@@ -362,6 +362,11 @@ const chalisaReadingSchema = Joi.object({
   startingCount: Joi.number().integer().min(1).max(5000),
 });
 
+const chalisaAdminReadingSchema = Joi.object({
+  clientRequestId: Joi.string().uuid().required(),
+  count: Joi.number().integer().min(1).max(5000).required(),
+});
+
 const chalisaReadingParamsSchema = Joi.object({
   clientRequestId: Joi.string().uuid().required(),
 });
@@ -439,6 +444,7 @@ module.exports = {
   // Hanuman Chalisa
   chalisaParticipantSchema,
   chalisaReadingSchema,
+  chalisaAdminReadingSchema,
   chalisaReadingParamsSchema,
   chalisaMyStatsQuerySchema,
   chalisaBoardQuerySchema,
