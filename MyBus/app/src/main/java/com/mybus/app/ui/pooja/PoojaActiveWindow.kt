@@ -2,6 +2,13 @@ package com.mybus.app.ui.pooja
 
 import java.time.Duration
 import java.time.Instant
+import java.time.ZoneId
+
+/**
+ * Pujas are scheduled in India time, not the timezone configured on the device,
+ * so an admin abroad schedules (and everyone sees) the same moment.
+ */
+internal val PoojaTimeZone: ZoneId = ZoneId.of("Asia/Kolkata")
 
 internal const val POOJA_BOOKING_NOT_STARTED = "not_started"
 internal const val POOJA_BOOKING_OPEN = "open"

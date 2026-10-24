@@ -25,7 +25,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.mybus.app.data.remote.dto.PoojaListItem
 import java.time.Instant
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -285,7 +284,7 @@ private fun PoojaCard(
 private fun formatDateTime(isoString: String): String {
     return try {
         val instant = Instant.parse(isoString)
-        val zoned = instant.atZone(ZoneId.systemDefault())
+        val zoned = instant.atZone(PoojaTimeZone)
         val formatter = DateTimeFormatter.ofPattern("dd MMM, hh:mm a")
         zoned.format(formatter)
     } catch (_: Exception) {

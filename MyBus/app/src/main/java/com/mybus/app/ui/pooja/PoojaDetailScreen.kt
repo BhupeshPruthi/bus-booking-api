@@ -41,7 +41,6 @@ import com.mybus.app.data.remote.dto.PoojaDetailData
 import java.io.File
 import java.io.FileOutputStream
 import java.time.Instant
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -480,7 +479,7 @@ private fun BookingRow(
 private fun formatDateTime(isoString: String): String {
     return try {
         val instant = Instant.parse(isoString)
-        val zoned = instant.atZone(ZoneId.systemDefault())
+        val zoned = instant.atZone(PoojaTimeZone)
         val formatter = DateTimeFormatter.ofPattern("dd MMM yyyy, hh:mm a")
         zoned.format(formatter)
     } catch (_: Exception) {

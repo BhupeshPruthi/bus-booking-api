@@ -1065,8 +1065,8 @@ private fun AdminStayBookingPage(
     modifier: Modifier = Modifier,
     onConfirm: (CreateStayBookingRequest) -> Unit
 ) {
-    var checkInDate by remember { mutableStateOf(LocalDate.now().plusDays(1)) }
-    var checkOutDate by remember { mutableStateOf(LocalDate.now().plusDays(2)) }
+    var checkInDate by remember { mutableStateOf(stayToday().plusDays(1)) }
+    var checkOutDate by remember { mutableStateOf(stayToday().plusDays(2)) }
     var threeBed by remember { mutableStateOf("") }
     var fourBed by remember { mutableStateOf("") }
     var fiveBed by remember { mutableStateOf("") }
@@ -1232,7 +1232,13 @@ private fun AdminStayCancellationDialog(
         dismissButton = { TextButton(onClick = onDismiss) { Text("Back") } },
         confirmButton = {
             Button(
-                onClick = { onConfirm(decision, partialAmount, reason.trim().ifBlank { null }) },
+                onClick = {
+                    onConfirm(
+                        decision,
+                        partialAmount.takeIf { decision == "partial" },
+                        reason.trim().ifBlank { null }
+                    )
+                },
                 enabled = canConfirm
             ) { Text("Cancel booking") }
         }
@@ -1323,8 +1329,8 @@ private fun CreateCouponDialog(
 ) {
     var code by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
-    var startDate by remember { mutableStateOf(LocalDate.now()) }
-    var endDate by remember { mutableStateOf(LocalDate.now().plusDays(30)) }
+    var startDate by remember { mutableStateOf(stayToday()) }
+    var endDate by remember { mutableStateOf(stayToday().plusDays(30)) }
     val parsedAmount = amount.toDoubleOrNull()
     val canCreate = code.length >= 3 && (parsedAmount ?: 0.0) > 0 && !endDate.isBefore(startDate)
 
@@ -1453,7 +1459,7 @@ private fun BookingPage(
 }
 
 private fun stayArchiveRange(): Pair<String, String> {
-    val today = LocalDate.now()
+    val today = stayToday()
     return today.minusMonths(1).toString() to today.plusDays(1).toString()
 }
 
@@ -1700,7 +1706,7 @@ private fun CancellationDecisionDialog(
                     onDecision(
                         "approve",
                         decision,
-                        amount.toDoubleOrNull(),
+                        amount.toDoubleOrNull().takeIf { decision == "partial" },
                         reason.ifBlank { null }
                     )
                 },

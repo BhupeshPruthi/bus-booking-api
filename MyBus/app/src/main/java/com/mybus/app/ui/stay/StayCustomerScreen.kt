@@ -211,7 +211,7 @@ private fun StaySearchContent(
                         label = "Check-in",
                         date = state.checkInDate,
                         time = "12:00 noon",
-                        minDate = LocalDate.now(),
+                        minDate = stayToday(),
                         modifier = Modifier.fillMaxWidth(),
                         onSelected = { viewModel.setDates(it, state.checkOutDate) }
                     )

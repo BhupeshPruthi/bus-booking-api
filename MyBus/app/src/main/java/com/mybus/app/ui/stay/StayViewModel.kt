@@ -16,14 +16,18 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.ZoneId
 import javax.inject.Inject
+
+/** Stay dates are India calendar days (the server checks "today" in India time). */
+internal fun stayToday(): LocalDate = LocalDate.now(ZoneId.of("Asia/Kolkata"))
 
 data class StayUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val catalog: StayCatalog? = null,
-    val checkInDate: LocalDate = LocalDate.now().plusDays(1),
-    val checkOutDate: LocalDate = LocalDate.now().plusDays(2),
+    val checkInDate: LocalDate = stayToday().plusDays(1),
+    val checkOutDate: LocalDate = stayToday().plusDays(2),
     val quantities: Map<String, Int> = emptyMap(),
     val quote: StayQuote? = null,
     val couponInput: String = "",
@@ -308,8 +312,18 @@ class StayViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(error = null)
     }
 
+    /** After a successful request: start a fresh search so the same request isn't sent twice. */
     fun clearSubmission() {
-        _uiState.value = _uiState.value.copy(submittedBooking = null)
+        _uiState.value = _uiState.value.copy(
+            submittedBooking = null,
+            quantities = emptyMap(),
+            quote = null,
+            couponInput = "",
+            couponError = null,
+            couponMessage = null,
+            customerNote = "",
+            policyAccepted = false
+        )
     }
 
     private fun showError(error: Throwable, fallback: String) {

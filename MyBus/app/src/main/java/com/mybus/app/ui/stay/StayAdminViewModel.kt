@@ -112,7 +112,7 @@ class StayAdminViewModel @Inject constructor(
     }
 
     fun exportLastMonthRecords() {
-        val today = java.time.LocalDate.now()
+        val today = stayToday()
         val fromDate = today.minusMonths(1).toString()
         val toDate = today.plusDays(1).toString()
         viewModelScope.launch {
