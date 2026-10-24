@@ -51,6 +51,15 @@ fun AdminBusDetailScreen(
         onBack()
     }
 
+    state.actionError?.let { message ->
+        AlertDialog(
+            onDismissRequest = viewModel::consumeActionError,
+            title = { Text("Unable to continue") },
+            text = { Text(message) },
+            confirmButton = { TextButton(onClick = viewModel::consumeActionError) { Text("OK") } }
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
