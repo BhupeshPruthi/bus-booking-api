@@ -25,6 +25,8 @@ fun UnifiedBookingDetailScreen(
     val cancelsImmediately = state.booking?.let {
         it.bookingType == "stay" && it.rawStatus == "pending"
     } == true
+    // Only Stay sends a reason, so Bus doesn't ask for one.
+    val showsReasonField = state.booking?.bookingType == "stay"
 
     state.error?.let { message ->
         AlertDialog(
@@ -45,7 +47,8 @@ fun UnifiedBookingDetailScreen(
     }
     if (showCancellation) {
         AlertDialog(
-            onDismissRequest = { showCancellation = false },
+            // Stays open until the server answers, so the request can't be sent twice.
+            onDismissRequest = { if (!state.isCancelling) showCancellation = false },
             title = { Text(if (cancelsImmediately) "Cancel booking" else "Request cancellation") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -56,22 +59,34 @@ fun UnifiedBookingDetailScreen(
                             "This request will be sent to the relevant admin for review."
                         }
                     )
-                    OutlinedTextField(
-                        value = cancellationReason,
-                        onValueChange = { cancellationReason = it.take(1000) },
-                        label = { Text("Reason (optional)") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    if (showsReasonField) {
+                        OutlinedTextField(
+                            value = cancellationReason,
+                            onValueChange = { cancellationReason = it.take(1000) },
+                            label = { Text("Reason (optional)") },
+                            placeholder = { Text("Tell us why you wish to cancel") },
+                            enabled = !state.isCancelling,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
             },
             confirmButton = {
-                Button(onClick = {
-                    viewModel.requestCancellation(cancellationReason.ifBlank { null })
-                    showCancellation = false
-                }) { Text(if (cancelsImmediately) "Cancel booking" else "Submit request") }
+                if (state.isCancelling) {
+                    CircularProgressIndicator(Modifier.size(32.dp))
+                } else {
+                    Button(onClick = {
+                        viewModel.requestCancellation(cancellationReason) {
+                            showCancellation = false
+                        }
+                    }) { Text(if (cancelsImmediately) "Cancel booking" else "Submit request") }
+                }
             },
             dismissButton = {
-                TextButton(onClick = { showCancellation = false }) { Text("Back") }
+                TextButton(
+                    onClick = { showCancellation = false },
+                    enabled = !state.isCancelling
+                ) { Text("Back") }
             }
         )
     }
@@ -95,7 +110,11 @@ fun UnifiedBookingDetailScreen(
             ) { CircularProgressIndicator() }
             state.booking != null -> UnifiedBookingDetailsContent(
                 booking = state.booking!!,
-                onCancel = { showCancellation = true },
+                onCancel = {
+                    cancellationReason = ""
+                    showCancellation = true
+                },
+                isCancelling = state.isCancelling,
                 modifier = Modifier.padding(innerPadding)
             )
         }
@@ -106,6 +125,7 @@ fun UnifiedBookingDetailScreen(
 private fun UnifiedBookingDetailsContent(
     booking: UnifiedBookingItem,
     onCancel: () -> Unit,
+    isCancelling: Boolean,
     modifier: Modifier = Modifier
 ) {
     val details = booking.details
@@ -215,7 +235,11 @@ private fun UnifiedBookingDetailsContent(
 
         if ("request_cancellation" in booking.availableActions) {
             item {
-                OutlinedButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(
+                    onClick = onCancel,
+                    enabled = !isCancelling,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     Text("Request cancellation")
                 }
             }
