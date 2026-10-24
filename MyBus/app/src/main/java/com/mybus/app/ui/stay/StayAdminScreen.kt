@@ -254,9 +254,9 @@ fun StayAdminScreen(viewModel: StayAdminViewModel = hiltViewModel()) {
                     page = StayAdminPage.CREATE_BOOKING
                 }
                 StayAdminPage.CREATE_BOOKING -> AdminStayBookingPage(
+                    isSubmitting = state.isCreatingBooking,
                     onConfirm = {
-                        viewModel.createAdminBooking(it)
-                        page = StayAdminPage.DASHBOARD
+                        viewModel.createAdminBooking(it) { page = StayAdminPage.DASHBOARD }
                     }
                 )
                 StayAdminPage.PENDING -> BookingPage(
@@ -1062,6 +1062,7 @@ private fun DashboardAction(title: String, subtitle: String, onClick: () -> Unit
 
 @Composable
 private fun AdminStayBookingPage(
+    isSubmitting: Boolean,
     modifier: Modifier = Modifier,
     onConfirm: (CreateStayBookingRequest) -> Unit
 ) {
@@ -1158,11 +1159,17 @@ private fun AdminStayBookingPage(
                         )
                     )
                 },
-                enabled = canConfirm,
+                enabled = canConfirm && !isSubmitting,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 8.dp)
-            ) { Text("Confirm booking") }
+            ) {
+                if (isSubmitting) {
+                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                } else {
+                    Text("Confirm booking")
+                }
+            }
         }
         item { Spacer(Modifier.height(32.dp)) }
     }
