@@ -79,10 +79,15 @@ class StayViewModel @Inject constructor(
         }
     }
 
+    /** The server's longest stay, from the catalog; 7 until it loads, as on iOS. */
+    private val maxNights: Long
+        get() = (_uiState.value.catalog?.maxNights ?: 7).coerceAtLeast(1).toLong()
+
     fun setDates(checkIn: LocalDate, checkOut: LocalDate) {
+        val latestCheckout = checkIn.plusDays(maxNights)
         val normalizedCheckout = when {
             !checkOut.isAfter(checkIn) -> checkIn.plusDays(1)
-            checkOut.isAfter(checkIn.plusDays(7)) -> checkIn.plusDays(7)
+            checkOut.isAfter(latestCheckout) -> latestCheckout
             else -> checkOut
         }
         _uiState.value = _uiState.value.copy(
