@@ -38,6 +38,7 @@ import com.mybus.app.data.remote.dto.StayCancellation
 import com.mybus.app.data.remote.dto.StayCoupon
 import com.mybus.app.data.remote.dto.StayDailyOccupancyBookings
 import com.mybus.app.data.remote.dto.StayDailyOccupancyDay
+import com.mybus.app.ui.util.asRupees
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter

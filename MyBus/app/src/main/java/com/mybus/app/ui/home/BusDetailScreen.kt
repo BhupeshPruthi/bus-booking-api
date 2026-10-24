@@ -70,7 +70,8 @@ fun BusDetailScreen(
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = "${availability.availableSeats} seats left",
+                                    text = "${availability.availableSeats} " +
+                                        "${if (availability.availableSeats == 1) "seat" else "seats"} left",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )

@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.mybus.app.data.remote.dto.StayBooking
 import com.mybus.app.data.remote.dto.StayUnitType
+import com.mybus.app.ui.util.asRupees
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -608,6 +609,3 @@ internal fun StayDateButton(
         }
     }
 }
-
-internal fun Double.asRupees(): String =
-    if (this % 1.0 == 0.0) toInt().toString() else String.format("%.2f", this)
