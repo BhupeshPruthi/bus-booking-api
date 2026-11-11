@@ -16,6 +16,7 @@ const consumerRoutes = require('./routes/consumer');
 const stayRoutes = require('./routes/stay');
 const chalisaRoutes = require('./routes/chalisa');
 const aartiPathRoutes = require('./routes/aartiPath');
+const pageRoutes = require('./routes/pages');
 
 // Import cron jobs
 const { startExpireBookingsJob } = require('./jobs/expireBookings');
@@ -83,6 +84,9 @@ app.get('/health', (req, res) => {
     },
   });
 });
+
+// Privacy policy and support pages for the store listings
+app.use(pageRoutes);
 
 // API routes
 app.use('/api/auth', authRoutes);
