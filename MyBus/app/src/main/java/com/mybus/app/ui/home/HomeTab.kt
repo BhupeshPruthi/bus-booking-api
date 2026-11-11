@@ -29,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -79,6 +80,7 @@ fun HomeTab(
     canManageChalisa: Boolean = false,
     onOpenChalisa: () -> Unit = {},
     onScheduleChalisa: () -> Unit = {},
+    onOpenAartiPath: () -> Unit = {},
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -97,6 +99,13 @@ fun HomeTab(
                 canManage = canManageChalisa,
                 onOpen = onOpenChalisa,
                 onSchedule = onScheduleChalisa
+            )
+
+            ActionCard(
+                icon = ImageVector.vectorResource(R.drawable.ic_aarti_diya),
+                title = "Aarti & Path",
+                subtitle = "Chalisa, Aarti, Bajrang Baan and more",
+                onClick = onOpenAartiPath
             )
 
             GalleryHomeSection()

@@ -3,6 +3,7 @@ package com.mybus.app.data.remote
 import com.mybus.app.data.remote.dto.*
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
+import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
@@ -14,6 +15,8 @@ import retrofit2.http.PUT
 import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
+import retrofit2.http.Streaming
+import retrofit2.http.Tag
 
 interface ApiService {
 
@@ -317,4 +320,28 @@ interface ApiService {
 
     @POST("admin/chalisa/marathons/{id}/restore")
     suspend fun restoreChalisaMarathon(@Path("id") marathonId: String): Response<ApiResponse<ChalisaMarathonResult>>
+
+    // ---- Aarti & Path ----
+
+    @GET("aarti-path")
+    suspend fun getAartiPathItems(): Response<ApiResponse<List<AartiPathItem>>>
+
+    @Streaming
+    @GET("aarti-path/{id}/pdf")
+    suspend fun downloadAartiPathPdf(
+        @Path("id") itemId: String,
+        @Tag transfer: LargeTransfer = LargeTransfer
+    ): Response<ResponseBody>
+
+    @Multipart
+    @POST("admin/aarti-path")
+    suspend fun uploadAartiPath(
+        @Part("title") title: RequestBody,
+        @Part("pageCount") pageCount: RequestBody?,
+        @Part file: MultipartBody.Part,
+        @Tag transfer: LargeTransfer = LargeTransfer
+    ): Response<ApiResponse<AartiPathItem>>
+
+    @DELETE("admin/aarti-path/{id}")
+    suspend fun deleteAartiPath(@Path("id") itemId: String): Response<ApiResponse<AartiPathDeleteResult>>
 }
