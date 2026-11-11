@@ -79,7 +79,11 @@
     { "method": "DELETE", "path": "/api/admin/chalisa/marathons/:id", "auth": "bearer+superAdmin", "group": "chalisa-admin" },
     { "method": "POST", "path": "/api/admin/chalisa/marathons/:id/end", "auth": "bearer+superAdmin", "group": "chalisa-admin" },
     { "method": "POST", "path": "/api/admin/chalisa/marathons/:id/restore", "auth": "bearer+superAdmin", "group": "chalisa-admin" },
-    { "method": "POST", "path": "/api/admin/chalisa/readings", "auth": "bearer+superAdmin", "group": "chalisa-admin" }
+    { "method": "POST", "path": "/api/admin/chalisa/readings", "auth": "bearer+superAdmin", "group": "chalisa-admin" },
+    { "method": "GET", "path": "/api/aarti-path", "auth": "none", "group": "aarti-path" },
+    { "method": "GET", "path": "/api/aarti-path/:id/pdf", "auth": "none", "group": "aarti-path" },
+    { "method": "POST", "path": "/api/admin/aarti-path", "auth": "bearer+busAdmin", "group": "aarti-path-admin", "body": "multipart/form-data: title, optional pageCount, file (PDF, max 20 MB)" },
+    { "method": "DELETE", "path": "/api/admin/aarti-path/:id", "auth": "bearer+busAdmin", "group": "aarti-path-admin" }
   ],
   "myBusAndroidRetrofit": {
     "source": "MyBus/app/src/main/java/com/mybus/app/data/remote/ApiService.kt",
@@ -147,7 +151,11 @@
       "admin/chalisa/marathons/{id}",
       "admin/chalisa/marathons/{id}/end",
       "admin/chalisa/marathons/{id}/restore",
-      "admin/chalisa/readings"
+      "admin/chalisa/readings",
+      "aarti-path",
+      "aarti-path/{id}/pdf",
+      "admin/aarti-path",
+      "admin/aarti-path/{id}"
     ]
   }
 }

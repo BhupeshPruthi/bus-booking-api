@@ -3,11 +3,11 @@ const {
   DeleteObjectCommand,
   GetObjectCommand,
   PutObjectCommand,
-  S3Client,
 } = require('@aws-sdk/client-s3');
 const { v4: uuidv4 } = require('uuid');
 const config = require('../config');
-const { InternalError, NotFoundError, ValidationError } = require('../utils/errors');
+const { NotFoundError, ValidationError } = require('../utils/errors');
+const objectStorage = require('./objectStorage');
 
 const extensionByMime = {
   'image/jpeg': '.jpg',
@@ -25,43 +25,14 @@ const contentTypeByExtension = {
   '.webp': 'image/webp',
 };
 
-let client = null;
-
-function getMissingConfigKeys() {
-  const required = {
-    S3_ENDPOINT: config.s3.endpoint,
-    S3_BUCKET: config.s3.bucket,
-    S3_ACCESS_KEY_ID: config.s3.accessKeyId,
-    S3_SECRET_ACCESS_KEY: config.s3.secretAccessKey,
-    S3_PUBLIC_BASE_URL: config.s3.publicBaseUrl,
-  };
-
-  return Object.entries(required)
-    .filter(([, value]) => !String(value || '').trim())
-    .map(([key]) => key);
-}
+const STORAGE_LABEL = 'Event image';
 
 function assertConfigured() {
-  const missing = getMissingConfigKeys();
-  if (missing.length > 0) {
-    throw new InternalError(`Event image storage is not configured: missing ${missing.join(', ')}`);
-  }
+  objectStorage.assertConfigured(STORAGE_LABEL);
 }
 
 function getClient() {
-  assertConfigured();
-  if (!client) {
-    client = new S3Client({
-      endpoint: config.s3.endpoint,
-      region: config.s3.region,
-      forcePathStyle: config.s3.forcePathStyle,
-      credentials: {
-        accessKeyId: config.s3.accessKeyId,
-        secretAccessKey: config.s3.secretAccessKey,
-      },
-    });
-  }
-  return client;
+  return objectStorage.getS3Client(STORAGE_LABEL);
 }
 
 function getExtension(file) {
@@ -155,7 +126,7 @@ async function getEventImage(imageName) {
       cacheControl: result.CacheControl || 'public, max-age=31536000, immutable',
     };
   } catch (error) {
-    if (error?.name === 'NoSuchKey' || error?.$metadata?.httpStatusCode === 404) {
+    if (objectStorage.isMissingObjectError(error)) {
       throw new NotFoundError('Event image');
     }
     throw error;

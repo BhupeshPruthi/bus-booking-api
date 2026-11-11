@@ -3,16 +3,23 @@ const adminController = require('../controllers/adminController');
 const stayAdminController = require('../controllers/stayAdminController');
 const feedbackController = require('../controllers/feedbackController');
 const chalisaController = require('../controllers/chalisaController');
+const aartiPathController = require('../controllers/aartiPathController');
 const { authenticate } = require('../middlewares/authenticate');
 const {
   busAdminOrSuperUser,
   poojaAdminOrSuperUser,
   eventAdminOrSuperUser,
+  aartiPathAdminOrSuperUser,
   stayAdminOrSuperUser,
   anyAdminOrSuperUser,
   chalisaSuperAdmin,
 } = require('../middlewares/authorize');
-const { eventImageUpload, handleMulterError } = require('../middlewares/upload');
+const {
+  eventImageUpload,
+  handleMulterError,
+  pdfUpload,
+  handlePdfMulterError,
+} = require('../middlewares/upload');
 const validate = require('../middlewares/validate');
 const {
   bookingQuerySchema,
@@ -38,6 +45,8 @@ const {
   chalisaUpdateMarathonSchema,
   chalisaEndMarathonSchema,
   chalisaAdminReadingSchema,
+  createAartiPathSchema,
+  aartiPathParamsSchema,
 } = require('../validators/schemas');
 
 const router = express.Router();
@@ -130,6 +139,32 @@ router.post(
   handleMulterError,
   validate(createEventSchema),
   adminController.createEvent
+);
+
+/**
+ * @route POST /api/admin/aarti-path
+ * @desc Upload an Aarti & Path PDF (multipart: title, optional pageCount, file)
+ * @access Bus Admin or Super Admin
+ */
+router.post(
+  '/aarti-path',
+  aartiPathAdminOrSuperUser,
+  pdfUpload.single('file'),
+  handlePdfMulterError,
+  validate(createAartiPathSchema),
+  aartiPathController.create
+);
+
+/**
+ * @route DELETE /api/admin/aarti-path/:id
+ * @desc Delete an Aarti & Path item and its PDF for everyone
+ * @access Bus Admin or Super Admin
+ */
+router.delete(
+  '/aarti-path/:id',
+  aartiPathAdminOrSuperUser,
+  validate(aartiPathParamsSchema, 'params'),
+  aartiPathController.remove
 );
 
 /**

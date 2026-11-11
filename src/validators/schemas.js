@@ -340,6 +340,18 @@ const createEventSchema = Joi.object({
   eventDate: Joi.date().iso().required(),
 });
 
+// ============ AARTI & PATH SCHEMAS ============
+
+// Sent as multipart/form-data next to the PDF, so numbers arrive as text.
+const createAartiPathSchema = Joi.object({
+  title: Joi.string().trim().min(1).max(80).required(),
+  pageCount: Joi.number().integer().min(1).max(5000).empty('').optional(),
+});
+
+const aartiPathParamsSchema = Joi.object({
+  id: Joi.string().uuid().required(),
+});
+
 // ============ PAYMENT SCHEMAS ============
 
 const paymentActionSchema = Joi.object({
@@ -503,6 +515,10 @@ module.exports = {
 
   // Events
   createEventSchema,
+
+  // Aarti & Path
+  createAartiPathSchema,
+  aartiPathParamsSchema,
 
   // Payments
   paymentActionSchema,

@@ -10,6 +10,7 @@ const CAPABILITIES = Object.freeze({
   STAY_MANAGE: 'stay.manage',
   EVENT_MANAGE: 'event.manage',
   CHALISA_MANAGE: 'chalisa.manage',
+  AARTI_PATH_MANAGE: 'aarti_path.manage',
 });
 
 function normalizeAdminType(user) {
@@ -40,6 +41,7 @@ function capabilitiesFor(user) {
         CAPABILITIES.BUS_MANAGE,
         CAPABILITIES.POOJA_MANAGE,
         CAPABILITIES.EVENT_MANAGE,
+        CAPABILITIES.AARTI_PATH_MANAGE,
       ];
     case ADMIN_TYPES.STAY:
       return [CAPABILITIES.STAY_MANAGE];
