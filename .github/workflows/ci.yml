@@ -9,6 +9,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Fail fast if a test process ever hangs again (e.g. an undestroyed DB pool)
+    # instead of running until GitHub's 6-hour limit.
+    timeout-minutes: 15
     services:
       postgres:
         image: postgres:16

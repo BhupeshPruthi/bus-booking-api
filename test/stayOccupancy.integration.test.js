@@ -4,11 +4,26 @@ const assert = require('node:assert/strict');
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 // This test deliberately creates and drops tables. Make its declared test URL the
 // only database connection it can use before the Knex singleton is initialized.
-if (testDatabaseUrl) process.env.DATABASE_URL = testDatabaseUrl;
+// Its reduced Stay tables live in a private schema (via search_path), so they never
+// clash with the migrated tables and the user_booking_feed view that
+// chalisa.integration.test.js creates in the same database while running in parallel.
+const TEST_SCHEMA = 'stay_occupancy_test';
+if (testDatabaseUrl) {
+  const url = new URL(testDatabaseUrl);
+  url.searchParams.set('options', `-c search_path=${TEST_SCHEMA}`);
+  process.env.DATABASE_URL = url.toString();
+}
 const hasTestDatabase = Boolean(testDatabaseUrl);
 const { db } = require('../src/config/database');
 const { StayService } = require('../src/services/stayService');
 const { indiaDateOnly, addCalendarDays } = require('../src/services/stayService').helpers;
+
+// The Knex pool keeps `min` connections open, so the test process never exits
+// (and CI hangs) unless the pool is destroyed.
+test.after(async () => {
+  if (hasTestDatabase) await db.raw('DROP SCHEMA IF EXISTS ?? CASCADE', [TEST_SCHEMA]);
+  await db.destroy();
+});
 
 const TYPE_IDS = {
   threeBed: '00000000-0000-0000-0000-000000000001',
@@ -18,6 +33,7 @@ const TYPE_IDS = {
 };
 
 async function resetStayOccupancyTables() {
+  await db.raw('CREATE SCHEMA IF NOT EXISTS ??', [TEST_SCHEMA]);
   await db.schema.dropTableIfExists('stay_cancellation_requests');
   await db.schema.dropTableIfExists('stay_booking_items');
   await db.schema.dropTableIfExists('stay_bookings');

@@ -32,6 +32,11 @@ async function allowNextRound(participantId) {
 }
 
 test('Hanuman Chalisa marathon lifecycle and counting rules', { skip: !hasTestDatabase }, async (t) => {
+  // Registered first so the pool is released (and the process can exit) even if setup fails.
+  t.after(async () => {
+    await db.destroy();
+  });
+
   await db.migrate.latest({ directory: './src/db/migrations' });
   await db('chalisa_marathon_totals').del();
   await db('chalisa_readings').del();
@@ -41,10 +46,6 @@ test('Hanuman Chalisa marathon lifecycle and counting rules', { skip: !hasTestDa
   const admin = await createUser('Super Admin', 'admin');
   const bhupesh = await createUser('Bhupesh');
   const bhupeshId = { userId: bhupesh.id };
-
-  t.after(async () => {
-    await db.destroy();
-  });
 
   await t.test('no marathon: Home has no entry and counting is closed', async () => {
     const summary = await chalisa.getSummary({});
