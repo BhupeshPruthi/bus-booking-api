@@ -60,6 +60,11 @@ function normalizeText(value) {
     .trim();
 }
 
+/** Capitalises the first letter of each word, so "ram prasad" shows as "Ram Prasad". */
+function capitalizeWords(value) {
+  return String(value || '').replace(/(^|\s)(\p{Ll})/gu, (_, space, letter) => space + letter.toUpperCase());
+}
+
 function indiaDateOnly(now = new Date()) {
   return new Date(now.getTime() + (330 * 60 * 1000)).toISOString().slice(0, 10);
 }
@@ -133,7 +138,7 @@ function formatMarathon(row, now = new Date()) {
 
 function formatParticipant(row) {
   if (!row) return null;
-  return { id: row.id, displayName: row.display_name, isGuest: !row.user_id };
+  return { id: row.id, displayName: capitalizeWords(row.display_name), isGuest: !row.user_id };
 }
 
 function nameRequiredError() {
@@ -622,7 +627,7 @@ async function getMarathonBoard(identity, filters = {}, database = db, now = new
     leaderboard: rows.map((row) => ({
       rank: toCount(row.rank),
       participantId: row.participant_id,
-      displayName: row.display_name,
+      displayName: capitalizeWords(row.display_name),
       isGuest: !row.user_id,
       hasAdminAdditions: row.has_admin_additions === true,
       count: toCount(row.total),
@@ -863,6 +868,7 @@ module.exports = {
     computeStreak,
     monthRange,
     normalizeText,
+    capitalizeWords,
     indiaDateOnly,
     dateOnlyValue,
     marathonState,
