@@ -118,6 +118,15 @@ class TokenManager @Inject constructor(
         superU || type == "super_admin" || type == "bus_admin" || "event.manage" in caps
     }
 
+    /** Aarti & Path: adding and deleting PDFs (the same admins who add Events). */
+    val canManageAartiPath: Flow<Boolean> = combine(
+        isSuperUser,
+        adminType,
+        capabilities
+    ) { superU, type, caps ->
+        superU || type == "super_admin" || type == "bus_admin" || "aarti_path.manage" in caps
+    }
+
     suspend fun setDebugRoleOverride(mode: String?) {
         context.dataStore.edit { prefs ->
             if (mode.isNullOrBlank()) prefs.remove(DEBUG_ROLE_OVERRIDE)

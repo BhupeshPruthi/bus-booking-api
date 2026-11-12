@@ -27,13 +27,14 @@ const {
   createStayBookingSchema,
 } = require('../src/validators/schemas');
 
-test('legacy admins retain Bus, Pooja, and Event capabilities', () => {
+test('legacy admins retain Bus, Pooja, Event, and Aarti & Path capabilities', () => {
   const user = { role: 'admin' };
   assert.equal(normalizeAdminType(user), ADMIN_TYPES.BUS);
   assert.deepEqual(capabilitiesFor(user), [
     CAPABILITIES.BUS_MANAGE,
     CAPABILITIES.POOJA_MANAGE,
     CAPABILITIES.EVENT_MANAGE,
+    CAPABILITIES.AARTI_PATH_MANAGE,
   ]);
 });
 

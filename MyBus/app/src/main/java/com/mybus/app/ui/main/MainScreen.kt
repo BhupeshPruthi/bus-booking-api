@@ -15,6 +15,11 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.mybus.app.ui.aartipath.AARTI_PATH_READER_ROUTE
+import com.mybus.app.ui.aartipath.AARTI_PATH_ROUTE
+import com.mybus.app.ui.aartipath.AartiPathListScreen
+import com.mybus.app.ui.aartipath.AartiPathReaderScreen
+import com.mybus.app.ui.aartipath.aartiPathReaderRoute
 import com.mybus.app.ui.chalisa.CHALISA_TAB_GROUP
 import com.mybus.app.ui.chalisa.CHALISA_TAB_MY_PATH
 import com.mybus.app.ui.chalisa.ChalisaArchiveScreen
@@ -75,6 +80,7 @@ fun MainScreen(
     val canManageStay by tokenManager.canManageStay.collectAsStateWithLifecycle(initialValue = false)
     val canManageEvents by tokenManager.canManageEvents.collectAsStateWithLifecycle(initialValue = false)
     val canManageChalisa by tokenManager.canManageChalisa.collectAsStateWithLifecycle(initialValue = false)
+    val canManageAartiPath by tokenManager.canManageAartiPath.collectAsStateWithLifecycle(initialValue = false)
     val isAnyAdmin by tokenManager.isAnyAdmin.collectAsStateWithLifecycle(initialValue = false)
 
     val detailRoutes = remember {
@@ -99,6 +105,8 @@ fun MainScreen(
             CHALISA_ROUTE,
             CHALISA_SCHEDULE_ROUTE,
             CHALISA_ARCHIVE_ROUTE,
+            AARTI_PATH_ROUTE,
+            AARTI_PATH_READER_ROUTE,
             BottomTabs.PROFILE
         )
     }
@@ -193,6 +201,9 @@ fun MainScreen(
                     },
                     onScheduleChalisa = {
                         tabNavController.navigate("chalisa_schedule") { launchSingleTop = true }
+                    },
+                    onOpenAartiPath = {
+                        tabNavController.navigate(AARTI_PATH_ROUTE) { launchSingleTop = true }
                     }
                 )
             }
@@ -302,6 +313,24 @@ fun MainScreen(
             }
             composable(CHALISA_ARCHIVE_ROUTE) {
                 ChalisaArchiveScreen(onBack = { tabNavController.popBackStack() })
+            }
+            composable(AARTI_PATH_ROUTE) {
+                AartiPathListScreen(
+                    canManage = canManageAartiPath,
+                    onBack = { tabNavController.popBackStack() },
+                    onOpen = { item ->
+                        tabNavController.navigate(aartiPathReaderRoute(item.id, item.title)) { launchSingleTop = true }
+                    }
+                )
+            }
+            composable(
+                route = AARTI_PATH_READER_ROUTE,
+                arguments = listOf(
+                    navArgument("id") { type = NavType.StringType },
+                    navArgument("title") { type = NavType.StringType; nullable = true; defaultValue = null }
+                )
+            ) {
+                AartiPathReaderScreen(onBack = { tabNavController.popBackStack() })
             }
             composable("live_events_web") {
                 InAppWebViewScreen(

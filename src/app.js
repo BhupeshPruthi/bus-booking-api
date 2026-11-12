@@ -15,6 +15,7 @@ const adminRoutes = require('./routes/admin');
 const consumerRoutes = require('./routes/consumer');
 const stayRoutes = require('./routes/stay');
 const chalisaRoutes = require('./routes/chalisa');
+const aartiPathRoutes = require('./routes/aartiPath');
 const pageRoutes = require('./routes/pages');
 
 // Import cron jobs
@@ -92,6 +93,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/stays', stayRoutes);
 app.use('/api/chalisa', chalisaRoutes);
+app.use('/api/aarti-path', aartiPathRoutes);
 app.use('/api', consumerRoutes);
 
 // 404 handler

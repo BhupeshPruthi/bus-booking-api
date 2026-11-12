@@ -57,6 +57,11 @@ const eventAdminOrSuperUser = requireCapability(
   'Access denied. Bus Admin or Super Admin required.'
 );
 
+const aartiPathAdminOrSuperUser = requireCapability(
+  CAPABILITIES.AARTI_PATH_MANAGE,
+  'Access denied. Bus Admin or Super Admin required to add or delete Aarti & Path PDFs.'
+);
+
 const chalisaSuperAdmin = requireCapability(
   CAPABILITIES.CHALISA_MANAGE,
   'Access denied. Only a Super Admin can start a new Hanuman Chalisa marathon.'
@@ -90,6 +95,7 @@ module.exports = {
   poojaAdminOrSuperUser,
   stayAdminOrSuperUser,
   eventAdminOrSuperUser,
+  aartiPathAdminOrSuperUser,
   chalisaSuperAdmin,
   anyAdminOrSuperUser,
   adminOrSuperUser,

@@ -4,6 +4,7 @@ import android.content.Context
 import com.mybus.app.data.local.TokenManager
 import com.mybus.app.data.remote.ApiService
 import com.mybus.app.data.remote.FallbackDns
+import com.mybus.app.data.remote.LargeTransfer
 import com.mybus.app.BuildConfig
 import com.mybus.app.data.remote.interceptor.AuthInterceptor
 import com.mybus.app.data.remote.interceptor.ChalisaGuestInterceptor
@@ -17,6 +18,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import okhttp3.Dns
+import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -62,11 +64,20 @@ object AppModule {
             .addInterceptor(chalisaGuestInterceptor)
             .apply {
                 if (BuildConfig.DEBUG) {
-                    addInterceptor(
-                        HttpLoggingInterceptor().apply {
-                            level = HttpLoggingInterceptor.Level.BODY
+                    val bodyLogger = HttpLoggingInterceptor().apply {
+                        level = HttpLoggingInterceptor.Level.BODY
+                    }
+                    // PDF uploads and downloads: log headers only (see LargeTransfer).
+                    val headerLogger = HttpLoggingInterceptor().apply {
+                        level = HttpLoggingInterceptor.Level.HEADERS
+                    }
+                    addInterceptor(Interceptor { chain ->
+                        if (chain.request().tag(LargeTransfer::class.java) != null) {
+                            headerLogger.intercept(chain)
+                        } else {
+                            bodyLogger.intercept(chain)
                         }
-                    )
+                    })
                 }
             }
             .authenticator(tokenAuthenticator)
