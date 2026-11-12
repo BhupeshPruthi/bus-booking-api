@@ -12,6 +12,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.mybus.app.data.remote.dto.UnifiedBookingItem
+import com.mybus.app.ui.stay.formatStayDateRange
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -181,7 +182,7 @@ private fun UnifiedBookingDetailsContent(
                 item {
                     val stayRows = buildList {
                         if (details.checkInDate != null && details.checkOutDate != null) {
-                            add("Stay" to "${details.checkInDate} → ${details.checkOutDate}")
+                            add("Stay" to formatStayDateRange(details.checkInDate, details.checkOutDate))
                         }
                         details.guestCount?.let { add("Guests" to it.toString()) }
                         details.items.forEach { stayItem ->

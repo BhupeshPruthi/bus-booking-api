@@ -247,7 +247,7 @@ private fun BusDetailContent(bus: BusDetailData, modifier: Modifier = Modifier) 
                     DetailRow(
                         icon = Icons.Filled.EventSeat,
                         label = "Seats",
-                        value = "${availability.availableSeats} available / ${availability.bookableSeats} seats",
+                        value = availability.summary,
                         iconTint = journeyIconTint
                     )
                 }

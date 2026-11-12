@@ -227,7 +227,7 @@ private fun SeatAvailabilityLine(bus: BusListItem) {
         )
         Spacer(Modifier.width(6.dp))
         Text(
-            text = "${availability.availableSeats} available / ${availability.bookableSeats} seats",
+            text = availability.summary,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurfaceVariant
