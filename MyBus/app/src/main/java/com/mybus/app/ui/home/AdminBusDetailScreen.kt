@@ -308,7 +308,7 @@ private fun BusSummaryCard(bus: BusDetailData, bookings: List<BookingData>) {
             val availability = bus.seatAvailabilityFromBookings(bookings)
             SummaryRow(
                 Icons.Filled.EventSeat, "Seats",
-                "${availability.availableSeats} available / ${availability.bookableSeats} seats"
+                availability.summary
             )
             SummaryRow(
                 Icons.Filled.ConfirmationNumber, "Requested",
@@ -679,7 +679,7 @@ private fun createBookingsPdf(
         drawWrapped("Departure: ${formatDateTimeFull(it.departureTime)}", bodyPaint)
         finalArrival?.let { arr -> drawWrapped("Arrival: ${formatDateTimeFull(arr)}", bodyPaint) }
         val availability = it.seatAvailabilityFromBookings(bookings)
-        drawWrapped("${availability.availableSeats} available / ${availability.bookableSeats} seats", bodyPaint)
+        drawWrapped(availability.summary, bodyPaint)
         drawWrapped("${availability.reservedSeats} requested / ${availability.totalSeats} total", bodyPaint)
         drawWrapped("Fare: Rs ${it.price.toLong()} per seat", bodyPaint, extraBottom = 8f)
     }

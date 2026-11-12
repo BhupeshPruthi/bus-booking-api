@@ -25,6 +25,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 private enum class CustomerStayPage { SEARCH, BOOKING_DETAILS, MY_STAYS }
 
@@ -303,7 +304,7 @@ private fun StayBookingDetailsContent(
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("Your stay", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text("${quote.checkInDate} → ${quote.checkOutDate} · ${quote.nightCount} night(s)")
+                    Text("${formatStayDateRange(quote.checkInDate, quote.checkOutDate)} · ${quote.nightCount} night(s)")
                     quote.unitTypes.filter { (it.requestedQuantity ?: 0) > 0 }.forEach {
                         Text("${it.displayName} × ${it.requestedQuantity}: ₹${(it.lineTotal ?: 0.0).asRupees()}")
                     }
@@ -539,7 +540,7 @@ internal fun StayBookingCard(
                     Text("Email: ${booking.contactEmail}")
                 }
             }
-            Text("${booking.checkInDate} → ${booking.checkOutDate} · ${booking.nightCount} night(s)")
+            Text("${formatStayDateRange(booking.checkInDate, booking.checkOutDate)} · ${booking.nightCount} night(s)")
             booking.createdAt?.let {
                 Text(
                     "Booked: ${formatStayBookingTimestamp(it)}",
@@ -576,6 +577,13 @@ internal fun formatStayBookingTimestamp(value: String): String = runCatching {
         .atZone(ZoneId.of("Asia/Kolkata"))
         .format(DateTimeFormatter.ofPattern("dd MMM yyyy, hh:mm a"))
 }.getOrDefault(value)
+
+/** "2026-10-25", "2026-10-26" → "25 Oct → 26 Oct". */
+internal fun formatStayDateRange(checkIn: String, checkOut: String): String {
+    val formatter = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH)
+    fun format(value: String) = runCatching { LocalDate.parse(value).format(formatter) }.getOrDefault(value)
+    return "${format(checkIn)} → ${format(checkOut)}"
+}
 
 @Composable
 internal fun StayDateButton(

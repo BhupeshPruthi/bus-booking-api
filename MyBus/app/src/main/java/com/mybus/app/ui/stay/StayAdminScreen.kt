@@ -971,7 +971,7 @@ private fun DailyOccupancyBookingCard(booking: StayBooking, occupancyDate: Strin
             )
 
             HorizontalDivider()
-            Text("Stay: ${booking.checkInDate} → ${booking.checkOutDate}")
+            Text("Stay: ${formatStayDateRange(booking.checkInDate, booking.checkOutDate)}")
             Text("${booking.nightCount} night(s) · ${booking.guestCount} guest(s)")
             Text(
                 "$accommodationUnits total accommodation ${if (accommodationUnits == 1) "unit" else "units"}",

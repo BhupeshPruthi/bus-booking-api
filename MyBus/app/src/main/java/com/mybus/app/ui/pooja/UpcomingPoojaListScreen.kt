@@ -169,7 +169,7 @@ private fun PoojaCard(
                 )
                 Spacer(Modifier.width(6.dp))
                 Text(
-                    text = "${pooja.availableTokens} / ${pooja.totalTokens} tokens",
+                    text = "${pooja.availableTokens} Available / ${pooja.totalTokens} tokens",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = if (pooja.availableTokens > 0)

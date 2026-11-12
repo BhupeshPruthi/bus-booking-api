@@ -9,7 +9,15 @@ data class SeatAvailability(
     val reservedSeats: Int,
     val bookableSeats: Int,
     val totalSeats: Int
-)
+) {
+    /** "Bus Fully Booked" once every bookable seat is taken, otherwise "X available / Y seats". */
+    val summary: String
+        get() = if (availableSeats == 0 && bookableSeats > 0) {
+            "Bus Fully Booked"
+        } else {
+            "$availableSeats available / $bookableSeats seats"
+        }
+}
 
 private val releasedSeatStatuses = setOf("cancelled", "rejected", "expired")
 
