@@ -84,6 +84,17 @@ class ChalisaLockScreenCounter @Inject constructor(
         notifications.cancel(NOTIFICATION_ID)
     }
 
+    /**
+     * The account was deleted: remove its counts from the lock screen and forget its last tap.
+     * The on/off choice and the guest pass belong to the phone, so they're kept.
+     */
+    suspend fun removeAfterAccountDeleted() {
+        store.clearLastTap()
+        store.setPendingRoundId(null)
+        lastContent = null
+        notifications.cancel(NOTIFICATION_ID)
+    }
+
     /** The +1 counter (not the "ended" message) is on the lock screen right now. */
     fun isCounterShowing(): Boolean =
         context.getSystemService(NotificationManager::class.java).activeNotifications

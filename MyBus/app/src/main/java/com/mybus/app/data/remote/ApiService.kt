@@ -29,6 +29,9 @@ interface ApiService {
     @POST("auth/logout")
     suspend fun logout(@Body request: RefreshTokenRequest): Response<ApiResponse<LogoutData>>
 
+    @DELETE("auth/account")
+    suspend fun deleteAccount(): Response<ApiResponse<DeleteAccountData>>
+
     @POST("admin/trips")
     suspend fun createTrip(@Body request: CreateTripRequest): Response<ApiResponse<TripData>>
 

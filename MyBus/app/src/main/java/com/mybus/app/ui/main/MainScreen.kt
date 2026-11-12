@@ -246,6 +246,10 @@ fun MainScreen(
             composable(BottomTabs.PROFILE) {
                 ProfileScreen(
                     onLogout = onLogout,
+                    onDeleteAccount = { authViewModel.deleteAccount() },
+                    isDeletingAccount = authUiState.isDeletingAccount,
+                    deleteAccountError = authUiState.deleteAccountError,
+                    onDismissDeleteAccountError = { authViewModel.clearDeleteAccountError() },
                     onBack = { tabNavController.popBackStack() },
                     onOpenChalisa = {
                         tabNavController.navigate("hanuman_chalisa?tab=$CHALISA_TAB_MY_PATH") { launchSingleTop = true }

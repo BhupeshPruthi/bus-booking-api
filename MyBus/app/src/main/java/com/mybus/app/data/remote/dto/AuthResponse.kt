@@ -59,3 +59,8 @@ data class TokenData(
 data class LogoutData(
     @Json(name = "message") val message: String
 )
+
+@JsonClass(generateAdapter = true)
+data class DeleteAccountData(
+    @Json(name = "message") val message: String
+)
