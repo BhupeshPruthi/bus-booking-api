@@ -56,3 +56,11 @@ tmp_*.png
 
 # Local secrets directory (use env or vault on server)
 secrets/
+
+# Release builds (APK/AAB) stay out of Git
+releases/
+
+# Xcode per-user and build files
+xcuserdata/
+*.xcuserstate
+DerivedData/
