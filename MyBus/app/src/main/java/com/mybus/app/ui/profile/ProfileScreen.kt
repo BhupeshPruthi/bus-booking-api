@@ -6,6 +6,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Person
@@ -27,6 +28,10 @@ import com.mybus.app.ui.theme.MyBusTheme
 @Composable
 fun ProfileScreen(
     onLogout: () -> Unit,
+    onDeleteAccount: () -> Unit = {},
+    isDeletingAccount: Boolean = false,
+    deleteAccountError: String? = null,
+    onDismissDeleteAccountError: () -> Unit = {},
     onBack: (() -> Unit)? = null,
     onOpenChalisa: () -> Unit = {},
     profileViewModel: ProfileViewModel = hiltViewModel()
@@ -36,6 +41,7 @@ fun ProfileScreen(
     val userName by profileViewModel.userName.collectAsStateWithLifecycle(initialValue = null)
 
     var showLogoutDialog by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
 
     if (showLogoutDialog) {
         AlertDialog(
@@ -53,6 +59,53 @@ fun ProfileScreen(
             dismissButton = {
                 TextButton(onClick = { showLogoutDialog = false }) {
                     Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (showDeleteDialog && deleteAccountError == null) {
+        AlertDialog(
+            onDismissRequest = { if (!isDeletingAccount) showDeleteDialog = false },
+            title = { Text("Delete account?") },
+            text = {
+                Text(
+                    "This permanently deletes your account and your Hanuman Chalisa counts. " +
+                        "It can't be undone. Records of past bookings may be kept."
+                )
+            },
+            confirmButton = {
+                if (isDeletingAccount) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                } else {
+                    TextButton(
+                        onClick = onDeleteAccount,
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Text("Delete")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }, enabled = !isDeletingAccount) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (deleteAccountError != null) {
+        val dismissError = {
+            showDeleteDialog = false
+            onDismissDeleteAccountError()
+        }
+        AlertDialog(
+            onDismissRequest = dismissError,
+            title = { Text("Account not deleted") },
+            text = { Text(deleteAccountError) },
+            confirmButton = {
+                TextButton(onClick = dismissError) {
+                    Text("OK")
                 }
             }
         )
@@ -184,6 +237,24 @@ fun ProfileScreen(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Logout", style = MaterialTheme.typography.titleMedium)
+            }
+
+            TextButton(
+                onClick = { showDeleteDialog = true },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.error
+                )
+            ) {
+                Icon(
+                    Icons.Filled.DeleteForever,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Delete account")
             }
         }
     }

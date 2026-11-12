@@ -78,6 +78,29 @@ class AuthRepository @Inject constructor(
         }
     }
 
+    /**
+     * Permanently deletes the account on the server, then signs out here. The server has
+     * already removed every refresh token, so there is no auth/logout call.
+     */
+    suspend fun deleteAccount(): Result<Unit> {
+        return try {
+            val response = apiService.deleteAccount()
+            if (response.isSuccessful && response.body()?.success == true) {
+                tokenManager.clear()
+                Result.success(Unit)
+            } else if (response.code() == 401) {
+                Result.failure(Exception("Your session has expired. Please sign in again, then delete your account."))
+            } else {
+                val errorMsg = response.body()?.error?.message
+                    ?: parseErrorMessage(response.errorBody()?.string())
+                    ?: "Couldn't delete your account. Please try again."
+                Result.failure(Exception(errorMsg))
+            }
+        } catch (e: Exception) {
+            Result.failure(Exception(networkErrorMessage(e)))
+        }
+    }
+
     suspend fun isLoggedIn(): Boolean {
         return !tokenManager.accessToken.firstOrNull().isNullOrEmpty()
     }
