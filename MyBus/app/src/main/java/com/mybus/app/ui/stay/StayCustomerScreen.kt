@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.mybus.app.data.remote.dto.StayBooking
 import com.mybus.app.data.remote.dto.StayUnitType
+import com.mybus.app.ui.util.asRupees
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -210,8 +211,8 @@ private fun StaySearchContent(
                     StayDateButton(
                         label = "Check-in",
                         date = state.checkInDate,
-                        time = "12:00 noon",
-                        minDate = LocalDate.now(),
+                        time = stayClockTime(state.catalog?.checkInTime, fallback = "12:00 noon"),
+                        minDate = stayToday(),
                         modifier = Modifier.fillMaxWidth(),
                         onSelected = { viewModel.setDates(it, state.checkOutDate) }
                     )
@@ -220,7 +221,7 @@ private fun StaySearchContent(
                     StayDateButton(
                         label = "Check-out",
                         date = state.checkOutDate,
-                        time = "11:00 AM",
+                        time = stayClockTime(state.catalog?.checkOutTime, fallback = "11:00 AM"),
                         minDate = state.checkInDate.plusDays(1),
                         modifier = Modifier.fillMaxWidth(),
                         onSelected = { viewModel.setDates(state.checkInDate, it) }
@@ -571,6 +572,17 @@ internal fun StayBookingCard(
     }
 }
 
+/** Catalog clock time for the date buttons, as iOS shows it: "12:00" → "12:00 noon", "11:00" → "11:00 AM". */
+internal fun stayClockTime(value: String?, fallback: String): String {
+    if (value.isNullOrEmpty()) return fallback
+    val parts = value.split(":").mapNotNull { it.toIntOrNull() }
+    if (parts.size < 2 || parts[0] !in 0..23 || parts[1] !in 0..59) return value
+    val (hour, minute) = parts
+    if (hour == 12 && minute == 0) return "12:00 noon"
+    val displayHour = if (hour % 12 == 0) 12 else hour % 12
+    return "$displayHour:${minute.toString().padStart(2, '0')} ${if (hour < 12) "AM" else "PM"}"
+}
+
 internal fun formatStayBookingTimestamp(value: String): String = runCatching {
     Instant.parse(value)
         .atZone(ZoneId.of("Asia/Kolkata"))
@@ -608,6 +620,3 @@ internal fun StayDateButton(
         }
     }
 }
-
-internal fun Double.asRupees(): String =
-    if (this % 1.0 == 0.0) toInt().toString() else String.format("%.2f", this)

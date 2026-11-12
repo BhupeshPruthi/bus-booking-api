@@ -38,6 +38,7 @@ import com.mybus.app.data.remote.dto.StayCancellation
 import com.mybus.app.data.remote.dto.StayCoupon
 import com.mybus.app.data.remote.dto.StayDailyOccupancyBookings
 import com.mybus.app.data.remote.dto.StayDailyOccupancyDay
+import com.mybus.app.ui.util.asRupees
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -254,9 +255,9 @@ fun StayAdminScreen(viewModel: StayAdminViewModel = hiltViewModel()) {
                     page = StayAdminPage.CREATE_BOOKING
                 }
                 StayAdminPage.CREATE_BOOKING -> AdminStayBookingPage(
+                    isSubmitting = state.isCreatingBooking,
                     onConfirm = {
-                        viewModel.createAdminBooking(it)
-                        page = StayAdminPage.DASHBOARD
+                        viewModel.createAdminBooking(it) { page = StayAdminPage.DASHBOARD }
                     }
                 )
                 StayAdminPage.PENDING -> BookingPage(
@@ -1062,11 +1063,12 @@ private fun DashboardAction(title: String, subtitle: String, onClick: () -> Unit
 
 @Composable
 private fun AdminStayBookingPage(
+    isSubmitting: Boolean,
     modifier: Modifier = Modifier,
     onConfirm: (CreateStayBookingRequest) -> Unit
 ) {
-    var checkInDate by remember { mutableStateOf(LocalDate.now().plusDays(1)) }
-    var checkOutDate by remember { mutableStateOf(LocalDate.now().plusDays(2)) }
+    var checkInDate by remember { mutableStateOf(stayToday().plusDays(1)) }
+    var checkOutDate by remember { mutableStateOf(stayToday().plusDays(2)) }
     var threeBed by remember { mutableStateOf("") }
     var fourBed by remember { mutableStateOf("") }
     var fiveBed by remember { mutableStateOf("") }
@@ -1158,11 +1160,17 @@ private fun AdminStayBookingPage(
                         )
                     )
                 },
-                enabled = canConfirm,
+                enabled = canConfirm && !isSubmitting,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 8.dp)
-            ) { Text("Confirm booking") }
+            ) {
+                if (isSubmitting) {
+                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                } else {
+                    Text("Confirm booking")
+                }
+            }
         }
         item { Spacer(Modifier.height(32.dp)) }
     }
@@ -1232,7 +1240,13 @@ private fun AdminStayCancellationDialog(
         dismissButton = { TextButton(onClick = onDismiss) { Text("Back") } },
         confirmButton = {
             Button(
-                onClick = { onConfirm(decision, partialAmount, reason.trim().ifBlank { null }) },
+                onClick = {
+                    onConfirm(
+                        decision,
+                        partialAmount.takeIf { decision == "partial" },
+                        reason.trim().ifBlank { null }
+                    )
+                },
                 enabled = canConfirm
             ) { Text("Cancel booking") }
         }
@@ -1323,8 +1337,8 @@ private fun CreateCouponDialog(
 ) {
     var code by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
-    var startDate by remember { mutableStateOf(LocalDate.now()) }
-    var endDate by remember { mutableStateOf(LocalDate.now().plusDays(30)) }
+    var startDate by remember { mutableStateOf(stayToday()) }
+    var endDate by remember { mutableStateOf(stayToday().plusDays(30)) }
     val parsedAmount = amount.toDoubleOrNull()
     val canCreate = code.length >= 3 && (parsedAmount ?: 0.0) > 0 && !endDate.isBefore(startDate)
 
@@ -1453,7 +1467,7 @@ private fun BookingPage(
 }
 
 private fun stayArchiveRange(): Pair<String, String> {
-    val today = LocalDate.now()
+    val today = stayToday()
     return today.minusMonths(1).toString() to today.plusDays(1).toString()
 }
 
@@ -1700,7 +1714,7 @@ private fun CancellationDecisionDialog(
                     onDecision(
                         "approve",
                         decision,
-                        amount.toDoubleOrNull(),
+                        amount.toDoubleOrNull().takeIf { decision == "partial" },
                         reason.ifBlank { null }
                     )
                 },

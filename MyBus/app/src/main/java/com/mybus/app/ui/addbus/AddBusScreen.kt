@@ -20,6 +20,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.mybus.app.ui.theme.AppOutlinedButton
 import com.mybus.app.ui.theme.outlinedControlLabelStyle
 import com.mybus.app.ui.theme.outlinedControlShape
+import com.mybus.app.ui.util.asRupees
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -45,7 +46,7 @@ fun AddBusScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("${trip.outbound.route.source} to ${trip.outbound.route.destination}")
                     Text("Bus: ${trip.outbound.busName}")
-                    Text("Seats: ${trip.outbound.totalSeats} | Fare: ₹${trip.outbound.price}")
+                    Text("Seats: ${trip.outbound.totalSeats} | Fare: ₹${trip.outbound.price.asRupees()}")
                     Text("Status: ${trip.outbound.status}")
                     if (trip.returnTrip != null) {
                         HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))

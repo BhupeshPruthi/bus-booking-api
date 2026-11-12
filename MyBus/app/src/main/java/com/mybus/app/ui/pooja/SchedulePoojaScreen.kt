@@ -195,7 +195,7 @@ private fun DateTimePicker(
 
     OutlinedButton(
         onClick = {
-            val initialDate = date ?: LocalDate.now()
+            val initialDate = date ?: LocalDate.now(PoojaTimeZone)
             val initialTime = time ?: LocalTime.of(9, 0)
             DatePickerDialog(
                 context,
@@ -227,7 +227,7 @@ private fun DateTimePicker(
 private fun formatDateTime(isoString: String): String {
     return try {
         val instant = java.time.Instant.parse(isoString)
-        val zoned = instant.atZone(java.time.ZoneId.systemDefault())
+        val zoned = instant.atZone(PoojaTimeZone)
         val formatter = java.time.format.DateTimeFormatter.ofPattern("dd MMM yyyy, hh:mm a")
         zoned.format(formatter)
     } catch (_: Exception) {

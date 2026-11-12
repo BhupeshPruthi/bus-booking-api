@@ -21,6 +21,7 @@ data class AdminBusDetailUiState(
     val bookingsError: String? = null,
     val error: String? = null,
     val actionInProgress: String? = null,
+    val actionError: String? = null,
     val isDeletingBus: Boolean = false,
     val deleteError: String? = null,
     val deleteSuccessMessage: String? = null
@@ -131,8 +132,11 @@ class AdminBusDetailViewModel @Inject constructor(
                     _uiState.value = _uiState.value.copy(actionInProgress = null)
                     loadAll()
                 }
-                .onFailure {
-                    _uiState.value = _uiState.value.copy(actionInProgress = null)
+                .onFailure { error ->
+                    _uiState.value = _uiState.value.copy(
+                        actionInProgress = null,
+                        actionError = error.message ?: "Unable to update the booking."
+                    )
                 }
         }
     }
@@ -161,6 +165,10 @@ class AdminBusDetailViewModel @Inject constructor(
         }
     }
 
+    fun consumeActionError() {
+        _uiState.value = _uiState.value.copy(actionError = null)
+    }
+
     fun consumeDeleteResult() {
         _uiState.value = _uiState.value.copy(deleteSuccessMessage = null, deleteError = null)
     }
@@ -173,8 +181,11 @@ class AdminBusDetailViewModel @Inject constructor(
                     _uiState.value = _uiState.value.copy(actionInProgress = null)
                     loadAll()
                 }
-                .onFailure {
-                    _uiState.value = _uiState.value.copy(actionInProgress = null)
+                .onFailure { error ->
+                    _uiState.value = _uiState.value.copy(
+                        actionInProgress = null,
+                        actionError = error.message ?: "Unable to update the booking."
+                    )
                 }
         }
     }

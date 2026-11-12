@@ -29,6 +29,17 @@ data class PoojaBookingUiState(
 private const val DEFAULT_POOJA_CITY = "Delhi - NCR"
 private const val MAX_POOJA_MEMBERS = 10
 
+// Letters plus combining marks, so Devanagari vowel signs and the virama survive
+// ("राम" stays "राम", not "रम").
+private val NameMarkCategories = setOf(
+    CharCategory.NON_SPACING_MARK,
+    CharCategory.COMBINING_SPACING_MARK,
+    CharCategory.ENCLOSING_MARK
+)
+
+private fun Char.isPoojaNameChar(): Boolean =
+    isLetter() || isWhitespace() || category in NameMarkCategories
+
 @HiltViewModel
 class PoojaBookingViewModel @Inject constructor(
     private val poojaRepository: PoojaRepository,
@@ -51,7 +62,7 @@ class PoojaBookingViewModel @Inject constructor(
         viewModelScope.launch {
             val defaultName = tokenManager.userName.firstOrNull()
                 .orEmpty()
-                .filter { it.isLetter() || it.isWhitespace() }
+                .filter { it.isPoojaNameChar() }
                 .take(50)
             val defaultPhone = tokenManager.userMobile.firstOrNull()
                 .orEmpty()
@@ -80,7 +91,7 @@ class PoojaBookingViewModel @Inject constructor(
 
     fun updateName(value: String) {
         val filtered = value
-            .filter { it.isLetter() || it.isWhitespace() }
+            .filter { it.isPoojaNameChar() }
             .take(50)
         _uiState.value = _uiState.value.copy(name = filtered, error = null)
     }
@@ -119,7 +130,7 @@ class PoojaBookingViewModel @Inject constructor(
             _uiState.value = state.copy(error = "Please enter your name")
             return
         }
-        if (!name.matches(Regex("^[\\p{L} ]+$"))) {
+        if (!name.matches(Regex("^[\\p{L}\\p{M} ]+$"))) {
             _uiState.value = state.copy(error = "Name should contain only letters")
             return
         }

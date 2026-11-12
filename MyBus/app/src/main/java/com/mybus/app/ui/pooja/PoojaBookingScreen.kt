@@ -35,7 +35,6 @@ import com.mybus.app.data.remote.dto.PoojaDetailData
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.Instant
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 private const val DEFAULT_POOJA_CITY = "Delhi - NCR"
@@ -447,7 +446,7 @@ private fun DetailLine(label: String, value: String) {
 private fun formatDateTime(isoString: String): String {
     return try {
         val instant = Instant.parse(isoString)
-        val zoned = instant.atZone(ZoneId.systemDefault())
+        val zoned = instant.atZone(PoojaTimeZone)
         val formatter = DateTimeFormatter.ofPattern("dd MMM yyyy, hh:mm a")
         zoned.format(formatter)
     } catch (_: Exception) {

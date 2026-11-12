@@ -26,7 +26,8 @@ class BusRepository @Inject constructor(
             ?.groupValues
             ?.getOrNull(1)
 
-        return extracted ?: raw
+        // A body without a message (e.g. a proxy's HTML error page) isn't worth showing.
+        return extracted ?: fallback
     }
 
     suspend fun getConsumerBuses(): Result<List<BusListItem>> {
@@ -123,7 +124,7 @@ class BusRepository @Inject constructor(
             if (response.isSuccessful && response.body()?.success == true) {
                 Result.success(response.body()!!.data!!)
             } else {
-                val msg = response.body()?.error?.message ?: "Failed to create booking"
+                val msg = errorMessage(response, "Failed to create booking")
                 Result.failure(Exception(msg))
             }
         } catch (e: Exception) {
@@ -167,7 +168,7 @@ class BusRepository @Inject constructor(
             if (response.isSuccessful && response.body()?.success == true) {
                 Result.success(response.body()!!.data!!)
             } else {
-                val msg = response.body()?.error?.message ?: "Failed to load bookings"
+                val msg = errorMessage(response, "Failed to load bookings")
                 Result.failure(Exception(msg))
             }
         } catch (e: Exception) {
@@ -184,7 +185,7 @@ class BusRepository @Inject constructor(
             if (response.isSuccessful && response.body()?.success == true) {
                 Result.success(response.body()!!.data!!)
             } else {
-                val msg = response.body()?.error?.message ?: "Failed to update booking"
+                val msg = errorMessage(response, "Failed to update booking")
                 Result.failure(Exception(msg))
             }
         } catch (e: Exception) {
@@ -198,7 +199,7 @@ class BusRepository @Inject constructor(
             if (response.isSuccessful && response.body()?.success == true) {
                 Result.success(response.body()!!.data!!)
             } else {
-                val msg = response.body()?.error?.message ?: "Failed to request cancellation"
+                val msg = errorMessage(response, "Failed to request cancellation")
                 Result.failure(Exception(msg))
             }
         } catch (e: Exception) {
@@ -212,7 +213,7 @@ class BusRepository @Inject constructor(
             if (response.isSuccessful && response.body()?.success == true) {
                 Result.success(response.body()!!.data!!)
             } else {
-                val msg = response.body()?.error?.message ?: "Failed to cancel booking"
+                val msg = errorMessage(response, "Failed to cancel booking")
                 Result.failure(Exception(msg))
             }
         } catch (e: Exception) {

@@ -29,6 +29,7 @@ data class StayAdminUiState(
     val bookingTotal: Int = 0,
     val exportBookings: List<StayBooking>? = null,
     val isExporting: Boolean = false,
+    val isCreatingBooking: Boolean = false,
     val pendingTotal: Int = 0,
     val confirmedTotal: Int = 0,
     val dailyOccupancy: StayDailyOccupancyReport? = null,
@@ -112,7 +113,7 @@ class StayAdminViewModel @Inject constructor(
     }
 
     fun exportLastMonthRecords() {
-        val today = java.time.LocalDate.now()
+        val today = stayToday()
         val fromDate = today.minusMonths(1).toString()
         val toDate = today.plusDays(1).toString()
         viewModelScope.launch {
@@ -226,23 +227,33 @@ class StayAdminViewModel @Inject constructor(
 
     fun confirm(id: String) = act("Booking confirmed") { repository.confirmBooking(id) }
 
-    fun createAdminBooking(request: CreateStayBookingRequest) {
+    /** Runs once at a time; [onCreated] fires only on success, so a failed form stays filled in. */
+    fun createAdminBooking(request: CreateStayBookingRequest, onCreated: () -> Unit) {
+        if (_uiState.value.isCreatingBooking) return
+        _uiState.value = _uiState.value.copy(isCreatingBooking = true, error = null, message = null)
         viewModelScope.launch {
             val email = tokenManager.userEmail.first().orEmpty().trim()
             if (email.isBlank()) {
                 _uiState.value = _uiState.value.copy(
+                    isCreatingBooking = false,
                     error = "Unable to find your login email. Please sign in again."
                 )
                 return@launch
             }
-            _uiState.value = _uiState.value.copy(isLoading = true, error = null, message = null)
             repository.createAdminBooking(request.copy(contactEmail = email))
                 .onSuccess {
-                    _uiState.value = _uiState.value.copy(message = "Stay booking confirmed")
+                    _uiState.value = _uiState.value.copy(
+                        isCreatingBooking = false,
+                        message = "Stay booking confirmed"
+                    )
+                    onCreated()
                     refreshDashboard()
                     loadBookings("confirmed")
                 }
-                .onFailure { showError(it, "Failed to create Stay booking") }
+                .onFailure {
+                    _uiState.value = _uiState.value.copy(isCreatingBooking = false)
+                    showError(it, "Failed to create Stay booking")
+                }
         }
     }
 

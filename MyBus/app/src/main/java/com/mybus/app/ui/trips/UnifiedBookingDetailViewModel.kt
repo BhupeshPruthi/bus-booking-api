@@ -17,7 +17,8 @@ data class UnifiedBookingDetailUiState(
     val isLoading: Boolean = false,
     val booking: UnifiedBookingItem? = null,
     val error: String? = null,
-    val message: String? = null
+    val message: String? = null,
+    val isCancelling: Boolean = false
 )
 
 @HiltViewModel
@@ -53,20 +54,27 @@ class UnifiedBookingDetailViewModel @Inject constructor(
         }
     }
 
-    fun requestCancellation(reason: String?) {
+    /** Runs once at a time; [onFinished] fires when the server answers, either way. */
+    fun requestCancellation(reason: String, onFinished: () -> Unit) {
         val booking = _uiState.value.booking ?: return
+        if (_uiState.value.isCancelling) return
+        _uiState.value = _uiState.value.copy(isCancelling = true, error = null, message = null)
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, error = null, message = null)
             val result = when (booking.bookingType) {
+                // Only Stay takes a reason; the Bus request has none.
                 "bus" -> busRepository.requestBookingCancellation(booking.bookingId).map { Unit }
-                "stay" -> stayRepository.requestCancellation(booking.bookingId, reason).map { Unit }
+                "stay" -> stayRepository.requestCancellation(
+                    booking.bookingId,
+                    reason.trim().ifEmpty { null }
+                ).map { Unit }
                 else -> Result.failure(Exception("Cancellation is not available for this booking"))
             }
+            onFinished()
             result.onSuccess {
                 val wasCancelledImmediately = booking.bookingType == "stay" &&
                     booking.rawStatus == "pending"
                 _uiState.value = _uiState.value.copy(
-                    isLoading = false,
+                    isCancelling = false,
                     message = if (wasCancelledImmediately) {
                         "Your booking has been cancelled"
                     } else {
@@ -76,7 +84,7 @@ class UnifiedBookingDetailViewModel @Inject constructor(
                 load()
             }.onFailure { error ->
                 _uiState.value = _uiState.value.copy(
-                    isLoading = false,
+                    isCancelling = false,
                     error = error.message ?: "Failed to request cancellation"
                 )
             }

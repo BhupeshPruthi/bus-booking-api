@@ -15,7 +15,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalTime
-import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
@@ -68,7 +67,7 @@ class SchedulePoojaViewModel @Inject constructor(
             return
         }
 
-        val zoned = ZonedDateTime.of(date, time, ZoneId.systemDefault())
+        val zoned = ZonedDateTime.of(date, time, PoojaTimeZone)
         val scheduledAt = zoned.toInstant().atOffset(ZoneOffset.UTC)
             .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
 
@@ -133,7 +132,7 @@ class SchedulePoojaViewModel @Inject constructor(
             poojaRepository.getAdminPoojaDetail(poojaId)
                 .onSuccess { pooja ->
                     val scheduled = runCatching {
-                        java.time.Instant.parse(pooja.scheduledAt).atZone(ZoneId.systemDefault())
+                        java.time.Instant.parse(pooja.scheduledAt).atZone(PoojaTimeZone)
                     }.getOrNull()
                     val highestConfirmedToken = pooja.bookings.orEmpty()
                         .filter { it.status == "confirmed" }
