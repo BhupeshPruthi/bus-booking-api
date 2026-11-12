@@ -8,7 +8,7 @@ const { authenticate } = require('../src/middlewares/authenticate');
 const chalisa = require('../src/services/chalisaService');
 const { CAPABILITIES, capabilitiesFor } = require('../src/services/adminCapabilityService');
 
-const { computeStreak, monthRange, normalizeText, marathonState } = chalisa.helpers;
+const { computeStreak, monthRange, normalizeText, capitalizeWords, marathonState } = chalisa.helpers;
 
 function run(middleware, headers) {
   const req = { headers };
@@ -31,6 +31,13 @@ test('month ranges handle December and reject bad input', () => {
 
 test('names are trimmed and control characters removed', () => {
   assert.equal(normalizeText('  Ram\u0007   Prasad \n'), 'Ram Prasad');
+});
+
+test('each word of a name starts with a capital letter', () => {
+  assert.equal(capitalizeWords('ram prasad'), 'Ram Prasad');
+  assert.equal(capitalizeWords('sita DEVI mcKenzie'), 'Sita DEVI McKenzie');
+  assert.equal(capitalizeWords('राम प्रसाद'), 'राम प्रसाद');
+  assert.equal(capitalizeWords(null), '');
 });
 
 test('marathon state follows its times', () => {
